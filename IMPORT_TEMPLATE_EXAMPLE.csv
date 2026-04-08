@@ -1,0 +1,9 @@
+Exercise #,Exercise Name,Sets,Reps,Base Config / Planned Weight,Progression Rule,Max Value,Rest,Video Reference
+1,Barbell Bench Press,4,8,80 kg,+2.5 kg every 2 successful sessions,100 kg,90 seconds,https://www.youtube.com/watch?v=example1
+2,Incline Dumbbell Press,4,10,30 kg,+1 kg every 3 successful sessions,40 kg,60 seconds,https://www.youtube.com/watch?v=example2
+3,Cable Flyes,3,12,12 kg,+2 kg every 2 successful sessions,25 kg,45 seconds,https://www.youtube.com/watch?v=example3
+4,Machine Chest Press,3,10,50 kg,+5 kg every 2 successful sessions,80 kg,60 seconds,https://www.youtube.com/watch?v=example4
+5,Push-ups,3,8-12,-,+1 rep every 1 successful session,50 reps,-,https://www.youtube.com/watch?v=example5
+6,Dips,3,6,bodyweight,+2.5 kg every 2 successful sessions,20 kg added,90 seconds,-
+7,Smith Machine Bench,3,12,60 kg,+1 kg every 3 successful sessions,80 kg,45 seconds,-
+8,Board Press,4,5,90 kg,-,120 kg,120 seconds,https://www.youtube.com/watch?v=example8

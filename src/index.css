@@ -1,0 +1,46 @@
+﻿:root {
+  --text: #1f1f24;
+  --muted: #5a6272;
+  --border: #ccd3df;
+  --surface-a: #f7f9fd;
+  --surface-b: #eef3fb;
+  --card: #ffffff;
+  --button-bg: #ffffff;
+  --accent: #0b5bd3;
+  --accent-bg: #dce9ff;
+  --accent-bg-soft: #ecf3ff;
+  --accent-border: #8fb2ef;
+
+  font-family: 'Segoe UI', 'Trebuchet MS', 'Gill Sans', sans-serif;
+  line-height: 1.4;
+  font-weight: 400;
+  color: var(--text);
+  background: radial-gradient(circle at top right, #f3f7ff, #edf2fa 50%, #e8edf7);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
