@@ -1,5 +1,10 @@
 ﻿import type { ProgramTemplate } from '../domain/types'
 
+// Helper function to get the correct image path with base URL
+function getImageUrl(imagePath: string): string {
+  return `${import.meta.env.BASE_URL}${imagePath.startsWith('/') ? imagePath.slice(1) : imagePath}`
+}
+
 export const seededProgramTemplates: ProgramTemplate[] = [
   {
     id: 'main-upper-biceps',
@@ -33,7 +38,7 @@ export const seededProgramTemplates: ProgramTemplate[] = [
               note: '+1kg each completed upper session if form is clean.',
             },
             reference: {
-              imageUrl: '/warm-up.png',
+              imageUrl: getImageUrl('warm-up.png'),
               techniqueNote: 'Start from dead hang, avoid kipping.',
             },
           },
@@ -53,7 +58,7 @@ export const seededProgramTemplates: ProgramTemplate[] = [
               note: '+1 rep per completed upper session.',
             },
             reference: {
-              imageUrl: '/warm-up.png',
+              imageUrl: getImageUrl('warm-up.png'),
               techniqueNote: 'Shoulders down and back, full lockout.',
             },
           },
@@ -73,7 +78,7 @@ export const seededProgramTemplates: ProgramTemplate[] = [
               note: '+2.5kg every 2 completed upper sessions.',
             },
             reference: {
-              imageUrl: '/warm-up.png',
+              imageUrl: getImageUrl('warm-up.png'),
               techniqueNote: 'Elbows fixed, no torso swing.',
             },
           },
@@ -93,7 +98,7 @@ export const seededProgramTemplates: ProgramTemplate[] = [
               note: '+2.5kg every 2 completed upper sessions.',
             },
             reference: {
-              imageUrl: '/Treadmill.png',
+              imageUrl: getImageUrl('Treadmill.png'),
             },
           },
           {
@@ -160,7 +165,7 @@ export const seededProgramTemplates: ProgramTemplate[] = [
               note: '+1kg per dumbbell every 2 completed upper sessions.',
             },
             reference: {
-              imageUrl: '/warm-up.png',
+              imageUrl: getImageUrl('warm-up.png'),
               techniqueNote: 'Neutral grip, controlled eccentric.',
             },
           },
@@ -249,7 +254,7 @@ export const seededProgramTemplates: ProgramTemplate[] = [
               maxValue: 120,
             },
             reference: {
-              imageUrl: '/Treadmill.png',
+              imageUrl: getImageUrl('Treadmill.png'),
             },
           },
           {
