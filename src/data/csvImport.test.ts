@@ -40,4 +40,20 @@ describe('csv import', () => {
     expect(exercise.progressionRule?.frequency).toBe(2)
     expect(exercise.progressionRule?.maxValue).toBe(50)
   })
+
+  it('stores GIF links as image references', () => {
+    const csv = `1,Incline Treadmill Walk,3,12,-,-,-,-,https://cdn.example.com/walk.gif`
+
+    const template = importProgramTemplateFromCsv(csv, {
+      programId: 'test-gif-reference',
+      programName: 'GIF Reference Import',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'biceps',
+    })
+
+    const exercise = template.sessions[0].exercises[0]
+    expect(exercise.reference?.imageUrl).toBe('https://cdn.example.com/walk.gif')
+    expect(exercise.reference?.videoUrl).toBeUndefined()
+  })
 })

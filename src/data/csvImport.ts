@@ -162,6 +162,21 @@ function parseProgressionRule(
   }
 }
 
+function parseExerciseReference(rawReference: string): ExerciseTemplate['reference'] {
+  if (!/^https?:\/\//i.test(rawReference)) {
+    return undefined
+  }
+
+  const isImageReference =
+    /\.(gif|png|jpe?g|webp|avif|bmp|svg)(?:[?#].*)?$/i.test(rawReference)
+
+  if (isImageReference) {
+    return { imageUrl: rawReference }
+  }
+
+  return { videoUrl: rawReference }
+}
+
 function parseCsvRows(csvText: string): string[][] {
   const parsed = Papa.parse<string[]>(csvText, {
     header: false,
@@ -214,8 +229,6 @@ function buildExercise(
     noteParts.push(`Rest: ${rawRest}`)
   }
 
-  const hasHttpReference = /^https?:\/\//i.test(rawReference)
-
   return {
     id: `${programId}-ex-${exerciseNumber}`,
     name: normalizeExerciseName(rawName, index),
@@ -226,7 +239,7 @@ function buildExercise(
       typeof plannedWeight === 'number' ? parseWeightUnit(rawBaseConfig) : undefined,
     progressionRule,
     note: noteParts.length > 0 ? noteParts.join(' | ') : undefined,
-    reference: hasHttpReference ? { videoUrl: rawReference } : undefined,
+    reference: parseExerciseReference(rawReference),
   }
 }
 

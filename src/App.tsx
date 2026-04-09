@@ -16,6 +16,7 @@ import {
   getTemplateById,
 } from './domain/logic'
 import { appReducer } from './domain/reducer'
+import { SessionPlanPanel } from './components/session/SessionPlanPanel'
 import type {
   ExerciseDifficulty,
   LogActivityInput,
@@ -629,123 +630,16 @@ function App() {
       {activeTab === 'session' && (
         <section className="panel-grid">
           <article className="card card-wide">
-            <h2>Session Plan</h2>
-            {activeRuns.length > 0 ? (
-              <div className="action-row">
-                <label className="inline-field">
-                  Active run:
-                  <select
-                    value={selectedRun?.id ?? ''}
-                    onChange={(event) =>
-                      dispatch({ type: 'setSelectedRun', runId: event.target.value })
-                    }
-                  >
-                    {activeRuns.map((run) => (
-                      <option key={run.id} value={run.id}>
-                        {run.templateName} ({run.track})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                {hasManualRunOverride ? (
-                  <button
-                    type="button"
-                    onClick={() => dispatch({ type: 'setSelectedRun', runId: null })}
-                  >
-                    Use Suggested Alternation
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-
-            {plannedSession ? (
-              <>
-                <p className="next-session-title">{plannedSession.session.name}</p>
-                <p className="muted">
-                  Focus: {plannedSession.run.focusTarget} | Track: {plannedSession.run.track}
-                </p>
-                {plannedSession.session.note ? (
-                  <p className="note">{plannedSession.session.note}</p>
-                ) : null}
-
-                <table className="plan-table">
-                  <thead>
-                    <tr>
-                      <th>Exercise</th>
-                      <th>Sets</th>
-                      <th>Reps</th>
-                      <th>Planned weight</th>
-                      <th>Progression</th>
-                      <th>Reference</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {plannedSession.exercises.map((exercise) => (
-                      <tr key={exercise.id}>
-                        <td>
-                          <strong>{exercise.name}</strong>
-                          {exercise.note ? <div className="muted">{exercise.note}</div> : null}
-                        </td>
-                        <td>{exercise.sets}</td>
-                        <td>{exercise.reps}</td>
-                        <td>
-                          {typeof exercise.plannedWeight === 'number'
-                            ? `${exercise.plannedWeight} ${exercise.weightUnit ?? ''}`
-                            : '-'}
-                        </td>
-                        <td>
-                          {exercise.progressionNote ? (
-                            <>
-                              <div>{exercise.progressionNote}</div>
-                              {exercise.nextTargetHint ? (
-                                <div className="muted">{exercise.nextTargetHint}</div>
-                              ) : null}
-                            </>
-                          ) : (
-                            '-'
-                          )}
-                        </td>
-                        <td>
-                          {exercise.reference?.videoUrl ? (
-                            <a href={exercise.reference.videoUrl} target="_blank" rel="noreferrer">
-                              Video
-                            </a>
-                          ) : null}
-                          {exercise.reference?.imageUrl ? (
-                            <a href={exercise.reference.imageUrl} target="_blank" rel="noreferrer">
-                              Image
-                            </a>
-                          ) : null}
-                          {exercise.reference?.techniqueNote ? (
-                            <div className="muted">{exercise.reference.techniqueNote}</div>
-                          ) : null}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                {(plannedSession.session.optionalActivities?.length ?? 0) > 0 ? (
-                  <div className="activities">
-                    <h3>Optional Activities</h3>
-                    <ul>
-                      {plannedSession.session.optionalActivities?.map((activity) => (
-                        <li key={activity.id}>
-                          {activity.name}
-                          {activity.defaultDuration
-                            ? ` (${activity.defaultDuration})`
-                            : ''}
-                          {activity.note ? ` - ${activity.note}` : ''}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <p>No active run selected.</p>
-            )}
+            <SessionPlanPanel
+              plannedSession={plannedSession}
+              activeRuns={activeRuns}
+              selectedRun={selectedRun}
+              hasManualRunOverride={hasManualRunOverride}
+              onSelectRun={(runId) => dispatch({ type: 'setSelectedRun', runId })}
+              onResetToSuggestedRun={() =>
+                dispatch({ type: 'setSelectedRun', runId: null })
+              }
+            />
           </article>
         </section>
       )}
