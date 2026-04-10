@@ -1,6 +1,9 @@
 import { useEffect, useId, useRef } from 'react'
 import type { PlannedExercise } from '../../domain/types'
-import { formatPlannedWeight, getEmbeddableVideoUrl } from './sessionPlanUtils'
+import {
+  formatPlannedWeightDetails,
+  getEmbeddableVideoUrl,
+} from './sessionPlanUtils'
 import { useExerciseGifUrl } from '../../hooks/useExerciseGifUrl'
 
 interface SessionExerciseDetailsModalProps {
@@ -136,7 +139,7 @@ export function SessionExerciseDetailsModal({
               </div>
               <div className="exercise-detail-item">
                 <span>Planned Weight</span>
-                <strong>{formatPlannedWeight(exercise)}</strong>
+                <strong>{formatPlannedWeightDetails(exercise)}</strong>
               </div>
               <div className="exercise-detail-item">
                 <span>Progression</span>

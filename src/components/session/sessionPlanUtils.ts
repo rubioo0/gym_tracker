@@ -46,28 +46,66 @@ export function getExerciseCategoryLabel(category: ExerciseCategory): string {
   }
 }
 
-export function formatPlannedWeight(exercise: PlannedExercise): string {
+function formatWeightNumber(value: number): string {
+  return Number(value.toFixed(2)).toString()
+}
+
+function formatWeightValue(value: number, unit?: string): string {
+  return `${formatWeightNumber(value)} ${unit ?? 'kg'}`.trim()
+}
+
+function formatPerHandValue(value: number, unit?: string): string {
+  return `${formatWeightNumber(value)} ${unit ?? 'kg'} на кожну руку`
+}
+
+export function formatPlannedWeightOverview(exercise: PlannedExercise): string {
+  if (typeof exercise.plannedWeightPerSide === 'number') {
+    return formatPerHandValue(exercise.plannedWeightPerSide, exercise.weightUnit)
+  }
+
+  if (typeof exercise.plannedWeight === 'number') {
+    // Overview should show only the effective working load.
+    return formatWeightValue(exercise.plannedWeight, exercise.weightUnit)
+  }
+
+  if (exercise.isBodyweightLoad) {
+    return 'body'
+  }
+
   if (exercise.plannedLoadLabel) {
     return exercise.plannedLoadLabel
   }
 
+  return '-'
+}
+
+export function formatPlannedWeightDetails(exercise: PlannedExercise): string {
+  if (typeof exercise.plannedWeightPerSide === 'number') {
+    return formatPerHandValue(exercise.plannedWeightPerSide, exercise.weightUnit)
+  }
+
   if (exercise.isBodyweightLoad) {
     if (typeof exercise.plannedWeight === 'number') {
-      return `body + ${exercise.plannedWeight} ${exercise.weightUnit ?? 'kg'}`
+      return `body + ${formatWeightValue(exercise.plannedWeight, exercise.weightUnit)}`
     }
 
     return 'body'
   }
 
   if (typeof exercise.plannedWeight !== 'number') {
+    if (exercise.plannedLoadLabel) {
+      return exercise.plannedLoadLabel
+    }
+
     return '-'
   }
 
-  if (typeof exercise.plannedWeightPerSide === 'number') {
-    return `${exercise.plannedWeight} ${exercise.weightUnit ?? ''} (${exercise.plannedWeightPerSide})`.trim()
-  }
+  return formatWeightValue(exercise.plannedWeight, exercise.weightUnit)
+}
 
-  return `${exercise.plannedWeight} ${exercise.weightUnit ?? ''}`.trim()
+// Backward compatibility for any existing imports.
+export function formatPlannedWeight(exercise: PlannedExercise): string {
+  return formatPlannedWeightDetails(exercise)
 }
 
 function cleanPathSegment(value: string): string {
