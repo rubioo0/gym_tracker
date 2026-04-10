@@ -83,6 +83,7 @@ function App() {
   const [csvTrack, setCsvTrack] = useState<TrackType>('upper')
   const [csvMode, setCsvMode] = useState<ProgramMode>('main')
   const [csvFocusTarget, setCsvFocusTarget] = useState('biceps')
+  const [csvDurationWeeks, setCsvDurationWeeks] = useState(8)
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([])
   const [selectedRunIds, setSelectedRunIds] = useState<string[]>([])
 
@@ -424,6 +425,7 @@ function App() {
         mode: csvMode,
         track: csvTrack,
         focusTarget: csvFocusTarget,
+        durationWeeks: csvDurationWeeks,
       })
 
       const nextTemplates = [
@@ -1194,6 +1196,24 @@ function App() {
                     type="text"
                     value={csvFocusTarget}
                     onChange={(event) => setCsvFocusTarget(event.target.value)}
+                  />
+                </label>
+
+                <label className="inline-field">
+                  Duration (weeks)
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={csvDurationWeeks}
+                    onChange={(event) => {
+                      const nextValue = Number(event.target.value)
+                      setCsvDurationWeeks(
+                        Number.isFinite(nextValue) && nextValue > 0
+                          ? Math.round(nextValue)
+                          : 8,
+                      )
+                    }}
                   />
                 </label>
               </div>

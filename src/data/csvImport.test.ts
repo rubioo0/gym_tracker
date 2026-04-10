@@ -3,7 +3,7 @@ import { importProgramTemplateFromCsv } from './csvImport'
 
 describe('csv import', () => {
   it('imports numbered rows into one template', () => {
-    const csv = `meta,,,,,,,,\nheader,,,,,,,,\n1,Barbell Curl,4 sets,12,25 kg,+2.5 every 2 sessions,100,,https://example.com/curl\n2,Hammer Curl,3 sets,10,12.5 kg,+1 every 1 session,35,,https://example.com/hammer`
+    const csv = `meta,,,,,,\nheader,,,,,,\n1,Barbell Curl,4 sets,12,25 kg,+2.5 every 2 sessions,https://example.com/curl\n2,Hammer Curl,3 sets,10,12.5 kg,+1 every 1 session,https://example.com/hammer`
 
     const template = importProgramTemplateFromCsv(csv, {
       programId: 'test-import',
@@ -22,10 +22,11 @@ describe('csv import', () => {
       'successfulTrackSessions',
     )
     expect(template.sessions[0].exercises[0].progressionRule?.frequency).toBe(2)
+    expect(template.sessions[0].exercises[0].progressionRule?.maxValue).toBe(40)
   })
 
   it('parses multiline quoted progression fields', () => {
-    const csv = `meta,,,,,,,,\nheader,,,,,,,,\n1,Exercise One,4 sets,12,20 kg,"- hold\n+ 2.5 every 2 sessions",50,,https://example.com/x`
+    const csv = `meta,,,,,,\nheader,,,,,,\n1,Exercise One,4 sets,12,20 kg,"- hold\n+ 2.5 every 2 sessions",https://example.com/x`
 
     const template = importProgramTemplateFromCsv(csv, {
       programId: 'test-multiline',
@@ -38,7 +39,7 @@ describe('csv import', () => {
     const exercise = template.sessions[0].exercises[0]
     expect(exercise.progressionRule?.amount).toBe(2.5)
     expect(exercise.progressionRule?.frequency).toBe(2)
-    expect(exercise.progressionRule?.maxValue).toBe(50)
+    expect(exercise.progressionRule?.maxValue).toBe(35)
   })
 
   it('stores GIF links as image references', () => {
@@ -58,7 +59,7 @@ describe('csv import', () => {
   })
 
   it('parses explicit progression format with week frequency', () => {
-    const csv = `1,Dumbbell Curl,4 sets,12,body + 10 kg,+5kg (2.5) | 2week,50 kg,,https://example.com/curl`
+    const csv = `1,Dumbbell Curl,4 sets,12,body + 10 kg,+5kg (2.5) | 2week,https://example.com/curl`
 
     const template = importProgramTemplateFromCsv(csv, {
       programId: 'test-progression-format',
@@ -74,11 +75,11 @@ describe('csv import', () => {
     expect(exercise.progressionRule?.frequency).toBe(2)
     expect(exercise.progressionRule?.frequencyUnit).toBe('week')
     expect(exercise.progressionRule?.note).toContain('(2.5)')
-    expect(exercise.progressionRule?.maxValue).toBe(50)
+    expect(exercise.progressionRule?.maxValue).toBe(30)
   })
 
   it('parses supported load formats from Навантаження column', () => {
-    const csv = `1,Body Move,3,12,body,+1kg | 1week,-,-,-\n2,Assisted Body,3,12,body + 7.5 kg,+2kg | 2week,-,-,-\n3,Barbell Lift,5,5,55 kg,+2kg | 1week,120 kg,-,-\n4,No Load Drill,4,10,-,-,-,-,-`
+    const csv = `1,Body Move,3,12,body,+1kg | 1week,-\n2,Assisted Body,3,12,body + 7.5 kg,+2kg | 2week,-\n3,Barbell Lift,5,5,55 kg,+2kg | 1week,-\n4,No Load Drill,4,10,-,-,-`
 
     const template = importProgramTemplateFromCsv(csv, {
       programId: 'test-load-formats',
@@ -106,7 +107,7 @@ describe('csv import', () => {
   })
 
   it('parses split two-hand base load format', () => {
-    const csv = `1,Dumbbell Press,4,10,10 kg (5),+5kg (2.5) | 2week,40 kg,-,-`
+    const csv = `1,Dumbbell Press,4,10,10 kg (5),+5kg (2.5) | 2week,-`
 
     const template = importProgramTemplateFromCsv(csv, {
       programId: 'test-two-hand-load',
@@ -124,5 +125,31 @@ describe('csv import', () => {
     expect(exercise.plannedLoadLabel).toBe('10 kg (5)')
     expect(exercise.progressionRule?.amount).toBe(5)
     expect(exercise.progressionRule?.amountPerSide).toBe(2.5)
+    expect(exercise.progressionRule?.maxValue).toBe(30)
+  })
+
+  it('scales automatic max value by selected duration', () => {
+    const csv = `1,Weighted Dip,3,8,10 kg,+5kg | 1week,-`
+
+    const shortTemplate = importProgramTemplateFromCsv(csv, {
+      programId: 'test-duration-4',
+      programName: 'Duration 4 Import',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'chest',
+      durationWeeks: 4,
+    })
+
+    const defaultTemplate = importProgramTemplateFromCsv(csv, {
+      programId: 'test-duration-8',
+      programName: 'Duration 8 Import',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'chest',
+      durationWeeks: 8,
+    })
+
+    expect(shortTemplate.sessions[0].exercises[0].progressionRule?.maxValue).toBe(30)
+    expect(defaultTemplate.sessions[0].exercises[0].progressionRule?.maxValue).toBe(50)
   })
 })

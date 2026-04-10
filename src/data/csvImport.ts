@@ -15,10 +15,15 @@ interface CsvImportOptions {
   mode?: ProgramMode
   track?: TrackType
   focusTarget?: string
+  durationWeeks?: number
 }
 
 const DEFAULT_MODE: ProgramMode = 'main'
 const DEFAULT_TRACK: TrackType = 'upper'
+const DEFAULT_DURATION_WEEKS = 8
+const BASELINE_DURATION_WEEKS = 8
+const BASELINE_SESSION_COUNT = 12
+const SESSIONS_PER_WEEK = BASELINE_SESSION_COUNT / BASELINE_DURATION_WEEKS
 
 interface ParsedLoadConfig {
   plannedWeight?: number
@@ -64,6 +69,18 @@ function extractInteger(value: string): number | undefined {
 
 function formatNumber(value: number): string {
   return Number(value.toFixed(2)).toString()
+}
+
+function normalizeDurationWeeks(durationWeeks: number | undefined): number {
+  if (!Number.isFinite(durationWeeks)) {
+    return DEFAULT_DURATION_WEEKS
+  }
+
+  return Math.max(1, Math.round(durationWeeks as number))
+}
+
+function estimateProgramSessionCount(durationWeeks: number): number {
+  return Math.max(1, Math.round(durationWeeks * SESSIONS_PER_WEEK))
 }
 
 function makeSlug(value: string): string {
@@ -361,10 +378,43 @@ function parseProgressionPerSideAmount(progressionRaw: string): number | undefin
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
+function estimateProgressionSteps(
+  frequency: number,
+  frequencyUnit: ProgressionFrequencyUnit,
+  durationWeeks: number,
+  durationSessionCount: number,
+): number {
+  if (frequency <= 0) {
+    return 0
+  }
+
+  if (frequencyUnit === 'week') {
+    return Math.floor(durationWeeks / frequency)
+  }
+
+  return Math.floor(durationSessionCount / frequency)
+}
+
+function pickReferenceCell(row: string[]): string {
+  // New format places reference in column 7. Legacy imports may still keep it in column 9.
+  const candidates = [row[6], row[7], row[8]]
+
+  for (const candidate of candidates) {
+    const normalized = normalizeCell(candidate ?? '')
+    if (/^https?:\/\//i.test(normalized)) {
+      return normalized
+    }
+  }
+
+  return normalizeCell(candidates[0] ?? '')
+}
+
 function parseProgressionRule(
   progressionRaw: string,
-  maxValueRaw: string,
   fallbackType: 'weight' | 'reps',
+  plannedWeight: number | undefined,
+  durationWeeks: number,
+  durationSessionCount: number,
 ): ProgressionRule | undefined {
   if (isEmptyOrDash(progressionRaw)) {
     return undefined
@@ -386,16 +436,27 @@ function parseProgressionRule(
 
   const normalizedProgression = progressionRaw.replace(/\s+/g, ' ').trim()
 
-  const maxValue = extractNumbers(maxValueRaw)[0]
+  const type = parseProgressionType(normalizedProgression, fallbackType)
+
+  let maxValue: number | undefined
+  if (type === 'weight' && typeof plannedWeight === 'number') {
+    const steps = estimateProgressionSteps(
+      frequency,
+      frequencyUnit,
+      durationWeeks,
+      durationSessionCount,
+    )
+    maxValue = Number((plannedWeight + steps * amount).toFixed(2))
+  }
 
   return {
-    type: parseProgressionType(normalizedProgression, fallbackType),
+    type,
     amount,
     amountPerSide,
     frequency,
     frequencyUnit,
     basis: 'successfulTrackSessions',
-    maxValue: typeof maxValue === 'number' ? maxValue : undefined,
+    maxValue,
     note: normalizedProgression,
   }
 }
@@ -435,6 +496,8 @@ function buildExercise(
   row: string[],
   index: number,
   programId: string,
+  durationWeeks: number,
+  durationSessionCount: number,
 ): ExerciseTemplate {
   const exerciseNumber = normalizeCell(row[0] ?? '') || `${index}`
   const rawName = normalizeCell(row[1] ?? '')
@@ -442,9 +505,7 @@ function buildExercise(
   const rawReps = normalizeCell(row[3] ?? '')
   const rawBaseConfig = normalizeCell(row[4] ?? '')
   const rawProgression = normalizeCell(row[5] ?? '')
-  const rawMaxValue = normalizeCell(row[6] ?? '')
-  const rawRest = normalizeCell(row[7] ?? '')
-  const rawReference = normalizeCell(row[8] ?? '')
+  const rawReference = pickReferenceCell(row)
 
   const parsedLoad = parseLoadConfig(rawBaseConfig)
 
@@ -453,8 +514,10 @@ function buildExercise(
 
   const progressionRule = parseProgressionRule(
     rawProgression,
-    rawMaxValue,
     fallbackType,
+    parsedLoad.plannedWeight,
+    durationWeeks,
+    durationSessionCount,
   )
 
   const noteParts: string[] = []
@@ -464,12 +527,6 @@ function buildExercise(
     !parsedLoad.plannedLoadLabel
   ) {
     noteParts.push(`Base: ${rawBaseConfig}`)
-  }
-  if (!isEmptyOrDash(rawMaxValue) && !progressionRule?.maxValue) {
-    noteParts.push(`Cap: ${rawMaxValue}`)
-  }
-  if (!isEmptyOrDash(rawRest)) {
-    noteParts.push(`Rest: ${rawRest}`)
   }
 
   return {
@@ -508,9 +565,11 @@ export function importProgramTemplateFromCsv(
   const mode = options.mode ?? DEFAULT_MODE
   const track = options.track ?? DEFAULT_TRACK
   const focusTarget = options.focusTarget?.trim() || 'imported-focus'
+  const durationWeeks = normalizeDurationWeeks(options.durationWeeks)
+  const durationSessionCount = estimateProgramSessionCount(durationWeeks)
 
   const exercises = exerciseRows.map((row, index) =>
-    buildExercise(row, index + 1, programId),
+    buildExercise(row, index + 1, programId, durationWeeks, durationSessionCount),
   )
 
   return {
