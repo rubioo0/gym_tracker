@@ -1,6 +1,6 @@
 import type { PlannedExercise } from '../../domain/types'
 import {
-  formatPlannedWeight,
+  formatPlannedWeightOverview,
   getExerciseCategory,
   getExerciseCategoryLabel,
 } from './sessionPlanUtils'
@@ -53,7 +53,7 @@ export function SessionExerciseCardList({
                 </span>
                 <span className="exercise-chip">
                   <strong>Weight</strong>
-                  {formatPlannedWeight(exercise)}
+                  {formatPlannedWeightOverview(exercise)}
                 </span>
               </div>
             </button>
