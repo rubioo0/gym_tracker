@@ -263,4 +263,30 @@ describe('app reducer', () => {
     expect(deleted.selectedRunId).toBeNull()
     expect(deleted.programTemplates.length).toBe(selected.programTemplates.length)
   })
+
+  it('bulk deletes selected runs and related logs', () => {
+    const startedUpper = appReducer(createInitialState(seededProgramTemplates), {
+      type: 'startRun',
+      templateId: 'main-upper-biceps',
+      now: '2026-04-08T10:00:00.000Z',
+    })
+
+    const startedBoth = appReducer(startedUpper, {
+      type: 'startRun',
+      templateId: 'main-lower-calves',
+      now: '2026-04-09T10:00:00.000Z',
+    })
+
+    const runsToDelete = startedBoth.focusRuns.slice(0, 2)
+
+    const deleted = appReducer(startedBoth, {
+      type: 'deleteRuns',
+      runIds: runsToDelete.map((run) => run.id),
+    })
+
+    expect(deleted.focusRuns.length).toBe(0)
+    expect(deleted.workoutLogs.length).toBe(0)
+    expect(deleted.selectedRunId).toBeNull()
+    expect(deleted.programTemplates.length).toBe(startedBoth.programTemplates.length)
+  })
 })

@@ -47,6 +47,10 @@ export function getExerciseCategoryLabel(category: ExerciseCategory): string {
 }
 
 export function formatPlannedWeight(exercise: PlannedExercise): string {
+  if (exercise.plannedLoadLabel) {
+    return exercise.plannedLoadLabel
+  }
+
   if (typeof exercise.plannedWeight !== 'number') {
     return '-'
   }

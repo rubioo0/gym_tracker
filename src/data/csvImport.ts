@@ -3,6 +3,7 @@ import type {
   ExerciseTemplate,
   ProgramMode,
   ProgramTemplate,
+  ProgressionFrequencyUnit,
   ProgressionRule,
   TrackType,
 } from '../domain/types'
@@ -18,6 +19,12 @@ interface CsvImportOptions {
 
 const DEFAULT_MODE: ProgramMode = 'main'
 const DEFAULT_TRACK: TrackType = 'upper'
+
+interface ParsedLoadConfig {
+  plannedWeight?: number
+  weightUnit?: string
+  plannedLoadLabel?: string
+}
 
 function normalizeCell(value: unknown): string {
   if (typeof value !== 'string') {
@@ -53,6 +60,10 @@ function extractInteger(value: string): number | undefined {
   return Math.trunc(first)
 }
 
+function formatNumber(value: number): string {
+  return Number(value.toFixed(2)).toString()
+}
+
 function makeSlug(value: string): string {
   return value
     .toLowerCase()
@@ -72,7 +83,18 @@ function normalizeSets(rawSets: string): string {
 
   const count = extractInteger(rawSets)
   if (typeof count === 'number' && count > 0) {
-    return `${count} підходи`
+    const mod10 = count % 10
+    const mod100 = count % 100
+
+    if (mod10 === 1 && mod100 !== 11) {
+      return `${count} підхід`
+    }
+
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+      return `${count} підходи`
+    }
+
+    return `${count} підходів`
   }
 
   return rawSets
@@ -111,7 +133,7 @@ function parseWeightUnit(baseConfig: string): string | undefined {
     return 'lbs'
   }
 
-  if (normalized.includes('kg')) {
+  if (normalized.includes('kg') || normalized.includes('кг')) {
     return 'kg'
   }
 
@@ -120,6 +142,172 @@ function parseWeightUnit(baseConfig: string): string | undefined {
   }
 
   return undefined
+}
+
+function normalizeWeightUnit(rawUnit: string | undefined): string {
+  if (!rawUnit) {
+    return 'kg'
+  }
+
+  const normalized = rawUnit.toLowerCase()
+  if (normalized.includes('lb')) {
+    return 'lbs'
+  }
+
+  return 'kg'
+}
+
+function parseLoadConfig(rawBaseConfig: string): ParsedLoadConfig {
+  if (isEmptyOrDash(rawBaseConfig)) {
+    return {}
+  }
+
+  const normalized = rawBaseConfig.toLowerCase().replace(/\s+/g, ' ').trim()
+
+  if (
+    normalized === 'body' ||
+    normalized === 'bodyweight' ||
+    normalized === 'bw' ||
+    normalized.includes('вага тіла')
+  ) {
+    return {
+      plannedLoadLabel: 'body',
+    }
+  }
+
+  const bodyPlusMatch = normalized.match(
+    /^body(?:weight)?\s*\+\s*(-?\d+(?:[.,]\d+)?)\s*(kg|kgs?|кг|lb|lbs)?$/i,
+  )
+  if (bodyPlusMatch) {
+    const amount = Number(bodyPlusMatch[1].replace(',', '.'))
+    if (!Number.isFinite(amount)) {
+      return {
+        plannedLoadLabel: rawBaseConfig,
+      }
+    }
+
+    const unit = normalizeWeightUnit(bodyPlusMatch[2])
+    return {
+      plannedWeight: amount,
+      weightUnit: unit,
+      plannedLoadLabel: `body + ${formatNumber(amount)} ${unit}`,
+    }
+  }
+
+  const weightOnlyMatch = normalized.match(
+    /^(-?\d+(?:[.,]\d+)?)\s*(kg|kgs?|кг|lb|lbs)?$/i,
+  )
+  if (weightOnlyMatch) {
+    const amount = Number(weightOnlyMatch[1].replace(',', '.'))
+    if (!Number.isFinite(amount)) {
+      return {
+        plannedLoadLabel: rawBaseConfig,
+      }
+    }
+
+    const unit = normalizeWeightUnit(weightOnlyMatch[2] ?? parseWeightUnit(rawBaseConfig))
+    return {
+      plannedWeight: amount,
+      weightUnit: unit,
+      plannedLoadLabel: `${formatNumber(amount)} ${unit}`,
+    }
+  }
+
+  const numberWithUnitMatch = rawBaseConfig.match(
+    /(-?\d+(?:[.,]\d+)?)\s*(kg|kgs?|кг|lb|lbs)/i,
+  )
+  if (numberWithUnitMatch) {
+    const amount = Number(numberWithUnitMatch[1].replace(',', '.'))
+    if (Number.isFinite(amount)) {
+      const unit = normalizeWeightUnit(numberWithUnitMatch[2])
+      return {
+        plannedWeight: amount,
+        weightUnit: unit,
+        plannedLoadLabel: `${formatNumber(amount)} ${unit}`,
+      }
+    }
+  }
+
+  const numericFallback = extractNumbers(rawBaseConfig)[0]
+  if (typeof numericFallback === 'number') {
+    const unit = parseWeightUnit(rawBaseConfig) ?? 'kg'
+    return {
+      plannedWeight: numericFallback,
+      weightUnit: unit,
+      plannedLoadLabel: `${formatNumber(numericFallback)} ${unit}`,
+    }
+  }
+
+  return {
+    plannedLoadLabel: rawBaseConfig,
+  }
+}
+
+function parseProgressionFrequency(
+  progressionRaw: string,
+): { frequency: number; frequencyUnit: ProgressionFrequencyUnit } {
+  const pipeMatch = progressionRaw.match(/\|\s*(\d+)\s*([a-zA-Zа-яА-ЯіІїЇєЄґҐ]*)/)
+  if (pipeMatch) {
+    const parsedFrequency = Number(pipeMatch[1])
+    const token = (pipeMatch[2] ?? '').toLowerCase()
+    const frequencyUnit: ProgressionFrequencyUnit =
+      token.includes('week') || token.includes('wk') || token.startsWith('тиж')
+        ? 'week'
+        : 'session'
+
+    if (Number.isInteger(parsedFrequency) && parsedFrequency > 0) {
+      return {
+        frequency: parsedFrequency,
+        frequencyUnit,
+      }
+    }
+  }
+
+  const allNumbers = extractNumbers(progressionRaw)
+  const frequencyCandidate = allNumbers
+    .slice(1)
+    .find((value) => Number.isInteger(value) && value > 0)
+
+  const frequency =
+    typeof frequencyCandidate === 'number' && frequencyCandidate > 0
+      ? frequencyCandidate
+      : 1
+
+  const normalized = progressionRaw.toLowerCase()
+  const frequencyUnit: ProgressionFrequencyUnit =
+    normalized.includes('week') || normalized.includes('wk') || normalized.includes('тиж')
+      ? 'week'
+      : 'session'
+
+  return {
+    frequency,
+    frequencyUnit,
+  }
+}
+
+function parseProgressionType(
+  progressionRaw: string,
+  fallbackType: 'weight' | 'reps',
+): 'weight' | 'reps' {
+  const normalized = progressionRaw.toLowerCase()
+
+  if (
+    normalized.includes('rep') ||
+    normalized.includes('повтор') ||
+    normalized.includes('раз')
+  ) {
+    return 'reps'
+  }
+
+  if (
+    normalized.includes('kg') ||
+    normalized.includes('кг') ||
+    normalized.includes('lb')
+  ) {
+    return 'weight'
+  }
+
+  return fallbackType
 }
 
 function parseProgressionRule(
@@ -141,24 +329,20 @@ function parseProgressionRule(
     return undefined
   }
 
-  const allNumbers = extractNumbers(progressionRaw)
-  const frequencyCandidate = allNumbers
-    .slice(1)
-    .find((value) => Number.isInteger(value) && value > 0)
-  const frequency =
-    typeof frequencyCandidate === 'number' && frequencyCandidate > 0
-      ? frequencyCandidate
-      : 1
+  const { frequency, frequencyUnit } = parseProgressionFrequency(progressionRaw)
+
+  const normalizedProgression = progressionRaw.replace(/\s+/g, ' ').trim()
 
   const maxValue = extractNumbers(maxValueRaw)[0]
 
   return {
-    type: fallbackType,
+    type: parseProgressionType(normalizedProgression, fallbackType),
     amount,
     frequency,
+    frequencyUnit,
     basis: 'successfulTrackSessions',
     maxValue: typeof maxValue === 'number' ? maxValue : undefined,
-    note: progressionRaw,
+    note: normalizedProgression,
   }
 }
 
@@ -208,9 +392,10 @@ function buildExercise(
   const rawRest = normalizeCell(row[7] ?? '')
   const rawReference = normalizeCell(row[8] ?? '')
 
-  const plannedWeight = extractNumbers(rawBaseConfig)[0]
+  const parsedLoad = parseLoadConfig(rawBaseConfig)
+
   const fallbackType: 'weight' | 'reps' =
-    typeof plannedWeight === 'number' ? 'weight' : 'reps'
+    typeof parsedLoad.plannedWeight === 'number' ? 'weight' : 'reps'
 
   const progressionRule = parseProgressionRule(
     rawProgression,
@@ -219,7 +404,11 @@ function buildExercise(
   )
 
   const noteParts: string[] = []
-  if (!isEmptyOrDash(rawBaseConfig) && typeof plannedWeight !== 'number') {
+  if (
+    !isEmptyOrDash(rawBaseConfig) &&
+    typeof parsedLoad.plannedWeight !== 'number' &&
+    !parsedLoad.plannedLoadLabel
+  ) {
     noteParts.push(`Base: ${rawBaseConfig}`)
   }
   if (!isEmptyOrDash(rawMaxValue) && !progressionRule?.maxValue) {
@@ -234,9 +423,9 @@ function buildExercise(
     name: normalizeExerciseName(rawName, index),
     sets: normalizeSets(rawSets),
     reps: normalizeReps(rawReps),
-    plannedWeight: typeof plannedWeight === 'number' ? plannedWeight : undefined,
-    weightUnit:
-      typeof plannedWeight === 'number' ? parseWeightUnit(rawBaseConfig) : undefined,
+    plannedWeight: parsedLoad.plannedWeight,
+    weightUnit: parsedLoad.weightUnit,
+    plannedLoadLabel: parsedLoad.plannedLoadLabel,
     progressionRule,
     note: noteParts.length > 0 ? noteParts.join(' | ') : undefined,
     reference: parseExerciseReference(rawReference),

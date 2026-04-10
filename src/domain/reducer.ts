@@ -25,6 +25,7 @@ export type AppAction =
   | { type: 'completeRun'; runId: string }
   | { type: 'archiveRun'; runId: string }
   | { type: 'deleteRun'; runId: string }
+  | { type: 'deleteRuns'; runIds: string[] }
   | { type: 'setSelectedRun'; runId: string | null }
   | { type: 'logSession'; payload: LogSessionInput }
   | { type: 'clearAllData'; templates: ProgramTemplate[] }
@@ -153,6 +154,23 @@ function deleteTemplatesById(state: AppState, templateIds: string[]): AppState {
     ...state,
     programTemplates: nextTemplates,
     ...removeRunsAndLogs(state, runIdsToDelete),
+  }
+}
+
+function deleteRunsById(state: AppState, runIds: string[]): AppState {
+  if (runIds.length === 0) {
+    return state
+  }
+
+  const runIdSet = new Set(runIds)
+  const hasAnyRun = state.focusRuns.some((run) => runIdSet.has(run.id))
+  if (!hasAnyRun) {
+    return state
+  }
+
+  return {
+    ...state,
+    ...removeRunsAndLogs(state, runIdSet),
   }
 }
 
@@ -386,15 +404,11 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     }
 
     case 'deleteRun': {
-      const runExists = state.focusRuns.some((run) => run.id === action.runId)
-      if (!runExists) {
-        return state
-      }
+      return deleteRunsById(state, [action.runId])
+    }
 
-      return {
-        ...state,
-        ...removeRunsAndLogs(state, new Set([action.runId])),
-      }
+    case 'deleteRuns': {
+      return deleteRunsById(state, action.runIds)
     }
 
     case 'setSelectedRun': {
