@@ -110,9 +110,28 @@
 }
 
 .template-group h3 {
-  margin: 0 0 0.45rem;
+  margin: 0;
   font-size: 0.95rem;
   letter-spacing: 0.02em;
+}
+
+.template-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.45rem;
+}
+
+.item-select-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.item-select-label input {
+  margin: 0;
 }
 
 .next-session-title {
@@ -145,6 +164,15 @@ button {
 
 button:hover {
   border-color: var(--accent-border);
+}
+
+button:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+button:disabled:hover {
+  border-color: var(--border);
 }
 
 .list-plain {

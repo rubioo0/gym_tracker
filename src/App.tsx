@@ -83,6 +83,7 @@ function App() {
   const [csvTrack, setCsvTrack] = useState<TrackType>('upper')
   const [csvMode, setCsvMode] = useState<ProgramMode>('main')
   const [csvFocusTarget, setCsvFocusTarget] = useState('biceps')
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([])
 
   const [exerciseInputs, setExerciseInputs] = useState<LogExerciseInput[]>([])
   const [activityInputs, setActivityInputs] = useState<LogActivityInput[]>([])
@@ -191,6 +192,11 @@ function App() {
     return grouped
   }, [state.programTemplates])
 
+  const selectedTemplateSet = useMemo(
+    () => new Set(selectedTemplateIds),
+    [selectedTemplateIds],
+  )
+
   const lastWorkout = state.workoutLogs[0] ?? null
 
   const upcomingProgression = plannedSession?.exercises.find(
@@ -277,10 +283,53 @@ function App() {
     }
 
     dispatch({
-      type: 'deleteTemplate',
-      templateId,
+      type: 'deleteTemplates',
+      templateIds: [templateId],
     })
+    setSelectedTemplateIds((previous) =>
+      previous.filter((selectedId) => selectedId !== templateId),
+    )
     setDataMessage(`Deleted program "${templateName}".`)
+  }
+
+  function handleBulkDeleteTemplates(): void {
+    const selectedTemplates = state.programTemplates.filter((template) =>
+      selectedTemplateSet.has(template.id),
+    )
+
+    if (selectedTemplates.length === 0) {
+      return
+    }
+
+    const approved = window.confirm(
+      `Delete ${selectedTemplates.length} selected program(s)? This cannot be undone.`,
+    )
+    if (!approved) {
+      return
+    }
+
+    dispatch({
+      type: 'deleteTemplates',
+      templateIds: selectedTemplates.map((template) => template.id),
+    })
+    setSelectedTemplateIds([])
+    setDataMessage(`Deleted ${selectedTemplates.length} selected program(s).`)
+  }
+
+  function handleDeleteRun(runId: string, templateName: string): void {
+    const relatedLogCount = state.workoutLogs.filter((log) => log.runId === runId).length
+    const confirmMessage =
+      relatedLogCount > 0
+        ? `Delete run "${templateName}" and ${relatedLogCount} related log(s)? This cannot be undone.`
+        : `Delete run "${templateName}"? This cannot be undone.`
+
+    const approved = window.confirm(confirmMessage)
+    if (!approved) {
+      return
+    }
+
+    dispatch({ type: 'deleteRun', runId })
+    setDataMessage(`Deleted run "${templateName}".`)
   }
 
   function handleExportState(): void {
@@ -480,49 +529,127 @@ function App() {
         <section className="panel-grid">
           <article className="card card-wide">
             <h2>Шаблони програм</h2>
-            {Object.entries(templatesByMode).map(([mode, templates]) => (
-              <div key={mode} className="template-group">
-                <h3>{mode.toUpperCase()}</h3>
-                {templates.length === 0 ? (
-                  <p className="muted">Немає шаблонів у цьому режимі.</p>
-                ) : (
-                  <ul className="list-plain">
-                    {templates.map((template) => (
-                      <li key={template.id} className="item-row">
-                        <div>
-                          <strong>{template.name}</strong>
-                          <div className="muted">
-                            Напрямок: {template.track} | Фокус: {template.focusTarget} | Сесії:{' '}
-                            {template.sessions.length}
+            <div className="action-row">
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={handleBulkDeleteTemplates}
+                disabled={selectedTemplateIds.length === 0}
+              >
+                Delete selected ({selectedTemplateIds.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedTemplateIds([])}
+                disabled={selectedTemplateIds.length === 0}
+              >
+                Clear selection
+              </button>
+            </div>
+
+            {Object.entries(templatesByMode).map(([mode, templates]) => {
+              const modeTemplateIds = new Set(templates.map((template) => template.id))
+              const allModeSelected =
+                templates.length > 0 &&
+                templates.every((template) => selectedTemplateSet.has(template.id))
+              const hasModeSelection = templates.some((template) =>
+                selectedTemplateSet.has(template.id),
+              )
+
+              return (
+                <div key={mode} className="template-group">
+                  <div className="template-group-header">
+                    <h3>{mode.toUpperCase()}</h3>
+                    {templates.length > 0 ? (
+                      <div className="action-row">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedTemplateIds((previous) => {
+                              const next = new Set(previous)
+                              templates.forEach((template) => next.add(template.id))
+                              return Array.from(next)
+                            })
+                          }
+                          disabled={allModeSelected}
+                        >
+                          Select all
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedTemplateIds((previous) =>
+                              previous.filter((selectedId) => !modeTemplateIds.has(selectedId)),
+                            )
+                          }
+                          disabled={!hasModeSelection}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {templates.length === 0 ? (
+                    <p className="muted">Немає шаблонів у цьому режимі.</p>
+                  ) : (
+                    <ul className="list-plain">
+                      {templates.map((template) => (
+                        <li key={template.id} className="item-row">
+                          <div>
+                            <label className="item-select-label">
+                              <input
+                                type="checkbox"
+                                checked={selectedTemplateSet.has(template.id)}
+                                onChange={(event) =>
+                                  setSelectedTemplateIds((previous) => {
+                                    if (event.target.checked) {
+                                      return previous.includes(template.id)
+                                        ? previous
+                                        : [...previous, template.id]
+                                    }
+
+                                    return previous.filter(
+                                      (selectedId) => selectedId !== template.id,
+                                    )
+                                  })
+                                }
+                              />
+                              <strong>{template.name}</strong>
+                            </label>
+                            <div className="muted">
+                              Напрямок: {template.track} | Фокус: {template.focusTarget} | Сесії:{' '}
+                              {template.sessions.length}
+                            </div>
                           </div>
-                        </div>
-                        <div className="action-row">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              dispatch({
-                                type: 'startRun',
-                                templateId: template.id,
-                                now: new Date().toISOString(),
-                              })
-                            }
-                          >
-                            Розпочати тренування
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteTemplate(template.id, template.name)}
-                            className="btn-danger"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
+                          <div className="action-row">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                dispatch({
+                                  type: 'startRun',
+                                  templateId: template.id,
+                                  now: new Date().toISOString(),
+                                })
+                              }
+                            >
+                              Розпочати тренування
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTemplate(template.id, template.name)}
+                              className="btn-danger"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )
+            })}
           </article>
 
           <article className="card card-wide">
@@ -616,6 +743,14 @@ function App() {
                               Archive
                             </button>
                           ) : null}
+
+                          <button
+                            type="button"
+                            className="btn-danger"
+                            onClick={() => handleDeleteRun(run.id, run.templateName)}
+                          >
+                            Delete
+                          </button>
                         </div>
                       </li>
                     ))}

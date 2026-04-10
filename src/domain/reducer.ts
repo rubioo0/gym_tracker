@@ -16,6 +16,7 @@ export type AppAction =
   | { type: 'hydrate'; payload: AppState }
   | { type: 'replaceTemplates'; templates: ProgramTemplate[] }
   | { type: 'deleteTemplate'; templateId: string }
+  | { type: 'deleteTemplates'; templateIds: string[] }
   | { type: 'startRun'; templateId: string; now: string }
   | { type: 'pauseRun'; runId: string; reason?: string }
   | { type: 'resumeRun'; runId: string }
@@ -23,6 +24,7 @@ export type AppAction =
   | { type: 'restartRun'; runId: string; now: string }
   | { type: 'completeRun'; runId: string }
   | { type: 'archiveRun'; runId: string }
+  | { type: 'deleteRun'; runId: string }
   | { type: 'setSelectedRun'; runId: string | null }
   | { type: 'logSession'; payload: LogSessionInput }
   | { type: 'clearAllData'; templates: ProgramTemplate[] }
@@ -105,6 +107,52 @@ function createRunFromTemplate(template: ProgramTemplate, now: string): FocusRun
     completedSessionCount: 0,
     successfulSessionCount: 0,
     nextSessionIndex: 0,
+  }
+}
+
+function removeRunsAndLogs(state: AppState, runIds: Set<string>) {
+  if (runIds.size === 0) {
+    return {
+      focusRuns: state.focusRuns,
+      workoutLogs: state.workoutLogs,
+      selectedRunId: state.selectedRunId,
+    }
+  }
+
+  return {
+    focusRuns: state.focusRuns.filter((run) => !runIds.has(run.id)),
+    workoutLogs: state.workoutLogs.filter((log) => !runIds.has(log.runId)),
+    selectedRunId:
+      state.selectedRunId && runIds.has(state.selectedRunId)
+        ? null
+        : state.selectedRunId,
+  }
+}
+
+function deleteTemplatesById(state: AppState, templateIds: string[]): AppState {
+  if (templateIds.length === 0) {
+    return state
+  }
+
+  const templateIdSet = new Set(templateIds)
+  const nextTemplates = state.programTemplates.filter(
+    (template) => !templateIdSet.has(template.id),
+  )
+
+  if (nextTemplates.length === state.programTemplates.length) {
+    return state
+  }
+
+  const runIdsToDelete = new Set(
+    state.focusRuns
+      .filter((run) => templateIdSet.has(run.templateId))
+      .map((run) => run.id),
+  )
+
+  return {
+    ...state,
+    programTemplates: nextTemplates,
+    ...removeRunsAndLogs(state, runIdsToDelete),
   }
 }
 
@@ -209,13 +257,11 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     }
 
     case 'deleteTemplate': {
-      const updatedTemplates = state.programTemplates.filter(
-        (template) => template.id !== action.templateId,
-      )
-      return {
-        ...state,
-        programTemplates: updatedTemplates,
-      }
+      return deleteTemplatesById(state, [action.templateId])
+    }
+
+    case 'deleteTemplates': {
+      return deleteTemplatesById(state, action.templateIds)
     }
 
     case 'startRun': {
@@ -336,6 +382,18 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         focusRuns: setRunStatus(state.focusRuns, action.runId, 'archived'),
         selectedRunId:
           state.selectedRunId === action.runId ? null : state.selectedRunId,
+      }
+    }
+
+    case 'deleteRun': {
+      const runExists = state.focusRuns.some((run) => run.id === action.runId)
+      if (!runExists) {
+        return state
+      }
+
+      return {
+        ...state,
+        ...removeRunsAndLogs(state, new Set([action.runId])),
       }
     }
 
