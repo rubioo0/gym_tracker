@@ -22,7 +22,9 @@ const DEFAULT_TRACK: TrackType = 'upper'
 
 interface ParsedLoadConfig {
   plannedWeight?: number
+  plannedWeightPerSide?: number
   weightUnit?: string
+  isBodyweightLoad?: boolean
   plannedLoadLabel?: string
 }
 
@@ -157,6 +159,19 @@ function normalizeWeightUnit(rawUnit: string | undefined): string {
   return 'kg'
 }
 
+function buildWeightLabel(
+  total: number,
+  unit: string,
+  perSide?: number,
+): string {
+  const totalLabel = `${formatNumber(total)} ${unit}`
+  if (typeof perSide === 'number') {
+    return `${totalLabel} (${formatNumber(perSide)})`
+  }
+
+  return totalLabel
+}
+
 function parseLoadConfig(rawBaseConfig: string): ParsedLoadConfig {
   if (isEmptyOrDash(rawBaseConfig)) {
     return {}
@@ -171,6 +186,7 @@ function parseLoadConfig(rawBaseConfig: string): ParsedLoadConfig {
     normalized.includes('вага тіла')
   ) {
     return {
+      isBodyweightLoad: true,
       plannedLoadLabel: 'body',
     }
   }
@@ -190,7 +206,29 @@ function parseLoadConfig(rawBaseConfig: string): ParsedLoadConfig {
     return {
       plannedWeight: amount,
       weightUnit: unit,
+      isBodyweightLoad: true,
       plannedLoadLabel: `body + ${formatNumber(amount)} ${unit}`,
+    }
+  }
+
+  const splitPerSideMatch = normalized.match(
+    /^(-?\d+(?:[.,]\d+)?)\s*(kg|kgs?|кг|lb|lbs)?\s*\(\s*(-?\d+(?:[.,]\d+)?)\s*\)$/i,
+  )
+  if (splitPerSideMatch) {
+    const total = Number(splitPerSideMatch[1].replace(',', '.'))
+    const perSide = Number(splitPerSideMatch[3].replace(',', '.'))
+    if (!Number.isFinite(total) || !Number.isFinite(perSide)) {
+      return {
+        plannedLoadLabel: rawBaseConfig,
+      }
+    }
+
+    const unit = normalizeWeightUnit(splitPerSideMatch[2] ?? parseWeightUnit(rawBaseConfig))
+    return {
+      plannedWeight: total,
+      plannedWeightPerSide: perSide,
+      weightUnit: unit,
+      plannedLoadLabel: buildWeightLabel(total, unit, perSide),
     }
   }
 
@@ -209,7 +247,7 @@ function parseLoadConfig(rawBaseConfig: string): ParsedLoadConfig {
     return {
       plannedWeight: amount,
       weightUnit: unit,
-      plannedLoadLabel: `${formatNumber(amount)} ${unit}`,
+      plannedLoadLabel: buildWeightLabel(amount, unit),
     }
   }
 
@@ -223,7 +261,7 @@ function parseLoadConfig(rawBaseConfig: string): ParsedLoadConfig {
       return {
         plannedWeight: amount,
         weightUnit: unit,
-        plannedLoadLabel: `${formatNumber(amount)} ${unit}`,
+        plannedLoadLabel: buildWeightLabel(amount, unit),
       }
     }
   }
@@ -234,7 +272,7 @@ function parseLoadConfig(rawBaseConfig: string): ParsedLoadConfig {
     return {
       plannedWeight: numericFallback,
       weightUnit: unit,
-      plannedLoadLabel: `${formatNumber(numericFallback)} ${unit}`,
+      plannedLoadLabel: buildWeightLabel(numericFallback, unit),
     }
   }
 
@@ -310,6 +348,19 @@ function parseProgressionType(
   return fallbackType
 }
 
+function parseProgressionPerSideAmount(progressionRaw: string): number | undefined {
+  const perSideMatch = progressionRaw.match(
+    /\+\s*\d+(?:[.,]\d+)?[^|\r\n]*\(\s*(-?\d+(?:[.,]\d+)?)\s*\)/,
+  )
+
+  if (!perSideMatch) {
+    return undefined
+  }
+
+  const parsed = Number(perSideMatch[1].replace(',', '.'))
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
 function parseProgressionRule(
   progressionRaw: string,
   maxValueRaw: string,
@@ -329,6 +380,8 @@ function parseProgressionRule(
     return undefined
   }
 
+  const amountPerSide = parseProgressionPerSideAmount(progressionRaw)
+
   const { frequency, frequencyUnit } = parseProgressionFrequency(progressionRaw)
 
   const normalizedProgression = progressionRaw.replace(/\s+/g, ' ').trim()
@@ -338,6 +391,7 @@ function parseProgressionRule(
   return {
     type: parseProgressionType(normalizedProgression, fallbackType),
     amount,
+    amountPerSide,
     frequency,
     frequencyUnit,
     basis: 'successfulTrackSessions',
@@ -424,7 +478,9 @@ function buildExercise(
     sets: normalizeSets(rawSets),
     reps: normalizeReps(rawReps),
     plannedWeight: parsedLoad.plannedWeight,
+    plannedWeightPerSide: parsedLoad.plannedWeightPerSide,
     weightUnit: parsedLoad.weightUnit,
+    isBodyweightLoad: parsedLoad.isBodyweightLoad,
     plannedLoadLabel: parsedLoad.plannedLoadLabel,
     progressionRule,
     note: noteParts.length > 0 ? noteParts.join(' | ') : undefined,

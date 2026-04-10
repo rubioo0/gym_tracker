@@ -56,6 +56,38 @@ describe('logic helpers', () => {
     expect(planned.nextTargetHint).toContain('1 session')
   })
 
+  it('applies per-side weight progression for split hand loads', () => {
+    const planned = getPlannedExercise(
+      {
+        id: 'e1',
+        name: 'Dumbbell Curl',
+        sets: '4',
+        reps: '10',
+        plannedWeight: 10,
+        plannedWeightPerSide: 5,
+        weightUnit: 'kg',
+        plannedLoadLabel: '10 kg (5)',
+        progressionRule: {
+          type: 'weight',
+          amount: 5,
+          amountPerSide: 2.5,
+          frequency: 2,
+          frequencyUnit: 'week',
+          basis: 'successfulTrackSessions',
+        },
+      },
+      {
+        completedSessionCount: 4,
+        successfulSessionCount: 4,
+      },
+    )
+
+    expect(planned.plannedWeight).toBe(20)
+    expect(planned.plannedWeightPerSide).toBe(10)
+    expect(planned.plannedLoadLabel).toBe('20 kg (10)')
+    expect(planned.nextTargetHint).toContain('week')
+  })
+
   it('applies reps progression for numeric ranges', () => {
     const planned = getPlannedExercise(
       {

@@ -70,6 +70,7 @@ describe('csv import', () => {
 
     const exercise = template.sessions[0].exercises[0]
     expect(exercise.progressionRule?.amount).toBe(5)
+    expect(exercise.progressionRule?.amountPerSide).toBe(2.5)
     expect(exercise.progressionRule?.frequency).toBe(2)
     expect(exercise.progressionRule?.frequencyUnit).toBe('week')
     expect(exercise.progressionRule?.note).toContain('(2.5)')
@@ -102,5 +103,26 @@ describe('csv import', () => {
 
     expect(noLoad.plannedWeight).toBeUndefined()
     expect(noLoad.plannedLoadLabel).toBeUndefined()
+  })
+
+  it('parses split two-hand base load format', () => {
+    const csv = `1,Dumbbell Press,4,10,10 kg (5),+5kg (2.5) | 2week,40 kg,-,-`
+
+    const template = importProgramTemplateFromCsv(csv, {
+      programId: 'test-two-hand-load',
+      programName: 'Two Hand Load Import',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'chest',
+    })
+
+    const exercise = template.sessions[0].exercises[0]
+
+    expect(exercise.plannedWeight).toBe(10)
+    expect(exercise.plannedWeightPerSide).toBe(5)
+    expect(exercise.weightUnit).toBe('kg')
+    expect(exercise.plannedLoadLabel).toBe('10 kg (5)')
+    expect(exercise.progressionRule?.amount).toBe(5)
+    expect(exercise.progressionRule?.amountPerSide).toBe(2.5)
   })
 })
