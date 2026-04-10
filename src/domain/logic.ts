@@ -111,6 +111,11 @@ function getProgressionSessionCount(
   return counters.completedSessionCount
 }
 
+function getFrequencyUnitLabel(rule: ProgressionRule, count: number): string {
+  const base = rule.frequencyUnit === 'week' ? 'week' : 'session'
+  return count === 1 ? base : `${base}s`
+}
+
 export function getPlannedExercise(
   exercise: ExerciseTemplate,
   countersOrCompleted: number | ProgressionCounters,
@@ -122,6 +127,7 @@ export function getPlannedExercise(
     reps: exercise.reps,
     plannedWeight: exercise.plannedWeight,
     weightUnit: exercise.weightUnit,
+    plannedLoadLabel: exercise.plannedLoadLabel,
     note: exercise.note,
     reference: exercise.reference,
   }
@@ -136,7 +142,7 @@ export function getPlannedExercise(
   const steps = getProgressionSteps(progressionSessionCount, rule.frequency)
   planned.progressionNote =
     rule.note ??
-    `${rule.type} +${rule.amount} every ${rule.frequency} ${rule.basis === 'successfulTrackSessions' ? 'successful' : 'completed'} sessions`
+    `${rule.type} +${rule.amount} every ${rule.frequency} ${getFrequencyUnitLabel(rule, rule.frequency)} (${rule.basis === 'successfulTrackSessions' ? 'successful' : 'completed'})`
 
   if (rule.type === 'weight' && typeof exercise.plannedWeight === 'number') {
     const progressedWeight = clamp(
@@ -147,7 +153,7 @@ export function getPlannedExercise(
     planned.plannedWeight = Number(progressedWeight.toFixed(2))
     planned.nextTargetHint =
       rule.frequency > 0
-        ? `Next increase in ${getSessionsUntilNext(progressionSessionCount, rule.frequency)} session(s)`
+        ? `Next increase in ${getSessionsUntilNext(progressionSessionCount, rule.frequency)} ${getFrequencyUnitLabel(rule, getSessionsUntilNext(progressionSessionCount, rule.frequency))}`
         : undefined
     return planned
   }
@@ -160,7 +166,7 @@ export function getPlannedExercise(
       planned.reps = start === end ? `${start}` : `${start}-${end}`
       planned.nextTargetHint =
         rule.frequency > 0
-          ? `Next increase in ${getSessionsUntilNext(progressionSessionCount, rule.frequency)} session(s)`
+          ? `Next increase in ${getSessionsUntilNext(progressionSessionCount, rule.frequency)} ${getFrequencyUnitLabel(rule, getSessionsUntilNext(progressionSessionCount, rule.frequency))}`
           : undefined
     }
   }

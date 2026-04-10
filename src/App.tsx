@@ -84,6 +84,7 @@ function App() {
   const [csvMode, setCsvMode] = useState<ProgramMode>('main')
   const [csvFocusTarget, setCsvFocusTarget] = useState('biceps')
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([])
+  const [selectedRunIds, setSelectedRunIds] = useState<string[]>([])
 
   const [exerciseInputs, setExerciseInputs] = useState<LogExerciseInput[]>([])
   const [activityInputs, setActivityInputs] = useState<LogActivityInput[]>([])
@@ -195,6 +196,13 @@ function App() {
   const selectedTemplateSet = useMemo(
     () => new Set(selectedTemplateIds),
     [selectedTemplateIds],
+  )
+
+  const selectedRunSet = useMemo(() => new Set(selectedRunIds), [selectedRunIds])
+
+  const selectedRunCount = useMemo(
+    () => state.focusRuns.filter((run) => selectedRunSet.has(run.id)).length,
+    [state.focusRuns, selectedRunSet],
   )
 
   const lastWorkout = state.workoutLogs[0] ?? null
@@ -329,7 +337,40 @@ function App() {
     }
 
     dispatch({ type: 'deleteRun', runId })
+    setSelectedRunIds((previous) =>
+      previous.filter((selectedId) => selectedId !== runId),
+    )
     setDataMessage(`Deleted run "${templateName}".`)
+  }
+
+  function handleBulkDeleteRuns(): void {
+    const selectedRuns = state.focusRuns.filter((run) => selectedRunSet.has(run.id))
+
+    if (selectedRuns.length === 0) {
+      return
+    }
+
+    const selectedRunIdSet = new Set(selectedRuns.map((run) => run.id))
+    const relatedLogCount = state.workoutLogs.filter((log) =>
+      selectedRunIdSet.has(log.runId),
+    ).length
+
+    const confirmMessage =
+      relatedLogCount > 0
+        ? `Delete ${selectedRuns.length} selected run(s) and ${relatedLogCount} related log(s)? This cannot be undone.`
+        : `Delete ${selectedRuns.length} selected run(s)? This cannot be undone.`
+
+    const approved = window.confirm(confirmMessage)
+    if (!approved) {
+      return
+    }
+
+    dispatch({
+      type: 'deleteRuns',
+      runIds: selectedRuns.map((run) => run.id),
+    })
+    setSelectedRunIds([])
+    setDataMessage(`Deleted ${selectedRuns.length} selected run(s).`)
   }
 
   function handleExportState(): void {
@@ -654,110 +695,188 @@ function App() {
 
           <article className="card card-wide">
             <h2>Тренування фокусу</h2>
-            {statusOrder.map((status) => (
-              <div key={status} className="template-group">
-                <h3>
-                  {statusLabel[status]} ({runsByStatus[status].length})
-                </h3>
+            <div className="action-row">
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={handleBulkDeleteRuns}
+                disabled={selectedRunCount === 0}
+              >
+                Delete selected ({selectedRunCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedRunIds([])}
+                disabled={selectedRunCount === 0}
+              >
+                Clear selection
+              </button>
+            </div>
 
-                {runsByStatus[status].length === 0 ? (
-                  <p className="muted">Немає тренувань у цьому статусі.</p>
-                ) : (
-                  <ul className="list-plain">
-                    {runsByStatus[status].map((run) => (
-                      <li key={run.id} className="item-row item-row-stack">
-                        <div>
-                          <strong>{run.templateName}</strong>
-                          <div className="muted">
-                            Напрямок: {run.track} | Фокус: {run.focusTarget} | Розпочато:{' '}
-                            {formatDateTime(run.startedAt)}
+            {statusOrder.map((status) => {
+              const statusRuns = runsByStatus[status]
+              const statusRunIds = new Set(statusRuns.map((run) => run.id))
+              const allStatusSelected =
+                statusRuns.length > 0 &&
+                statusRuns.every((run) => selectedRunSet.has(run.id))
+              const hasStatusSelection = statusRuns.some((run) =>
+                selectedRunSet.has(run.id),
+              )
+
+              return (
+                <div key={status} className="template-group">
+                  <div className="template-group-header">
+                    <h3>
+                      {statusLabel[status]} ({statusRuns.length})
+                    </h3>
+                    {statusRuns.length > 0 ? (
+                      <div className="action-row">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedRunIds((previous) => {
+                              const next = new Set(previous)
+                              statusRuns.forEach((run) => next.add(run.id))
+                              return Array.from(next)
+                            })
+                          }
+                          disabled={allStatusSelected}
+                        >
+                          Select all
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedRunIds((previous) =>
+                              previous.filter((selectedId) => !statusRunIds.has(selectedId)),
+                            )
+                          }
+                          disabled={!hasStatusSelection}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {statusRuns.length === 0 ? (
+                    <p className="muted">Немає тренувань у цьому статусі.</p>
+                  ) : (
+                    <ul className="list-plain">
+                      {statusRuns.map((run) => (
+                        <li key={run.id} className="item-row item-row-stack">
+                          <div>
+                            <label className="item-select-label">
+                              <input
+                                type="checkbox"
+                                checked={selectedRunSet.has(run.id)}
+                                onChange={(event) =>
+                                  setSelectedRunIds((previous) => {
+                                    if (event.target.checked) {
+                                      return previous.includes(run.id)
+                                        ? previous
+                                        : [...previous, run.id]
+                                    }
+
+                                    return previous.filter(
+                                      (selectedId) => selectedId !== run.id,
+                                    )
+                                  })
+                                }
+                              />
+                              <strong>{run.templateName}</strong>
+                            </label>
+                            <div className="muted">
+                              Напрямок: {run.track} | Фокус: {run.focusTarget} | Розпочато:{' '}
+                              {formatDateTime(run.startedAt)}
+                            </div>
+                            <div className="muted">
+                              Завершені сесії: {run.completedSessionCount} | Наступна позиція:{' '}
+                              {run.nextSessionIndex + 1}
+                            </div>
+                            {run.pauseReason ? (
+                              <div className="note">Pause reason: {run.pauseReason}</div>
+                            ) : null}
                           </div>
-                          <div className="muted">
-                            Завершені сесії: {run.completedSessionCount} | Наступна позиція:{' '}
-                            {run.nextSessionIndex + 1}
-                          </div>
-                          {run.pauseReason ? (
-                            <div className="note">Pause reason: {run.pauseReason}</div>
-                          ) : null}
-                        </div>
 
-                        <div className="action-row">
-                          <button
-                            type="button"
-                            onClick={() => dispatch({ type: 'setSelectedRun', runId: run.id })}
-                          >
-                            Select
-                          </button>
-
-                          {run.status === 'active' ? (
-                            <>
-                              <button type="button" onClick={() => handlePause(run.id)}>
-                                Pause
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => dispatch({ type: 'completeRun', runId: run.id })}
-                              >
-                                Complete
-                              </button>
-                            </>
-                          ) : null}
-
-                          {run.status === 'paused' ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => dispatch({ type: 'resumeRun', runId: run.id })}
-                              >
-                                Resume
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => dispatch({ type: 'switchRun', runId: run.id })}
-                              >
-                                Switch To This
-                              </button>
-                            </>
-                          ) : null}
-
-                          {(run.status === 'active' || run.status === 'paused') && (
+                          <div className="action-row">
                             <button
                               type="button"
-                              onClick={() =>
-                                dispatch({
-                                  type: 'restartRun',
-                                  runId: run.id,
-                                  now: new Date().toISOString(),
-                                })
-                              }
+                              onClick={() => dispatch({ type: 'setSelectedRun', runId: run.id })}
                             >
-                              Restart
+                              Select
                             </button>
-                          )}
 
-                          {run.status !== 'archived' ? (
+                            {run.status === 'active' ? (
+                              <>
+                                <button type="button" onClick={() => handlePause(run.id)}>
+                                  Pause
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => dispatch({ type: 'completeRun', runId: run.id })}
+                                >
+                                  Complete
+                                </button>
+                              </>
+                            ) : null}
+
+                            {run.status === 'paused' ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => dispatch({ type: 'resumeRun', runId: run.id })}
+                                >
+                                  Resume
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => dispatch({ type: 'switchRun', runId: run.id })}
+                                >
+                                  Switch To This
+                                </button>
+                              </>
+                            ) : null}
+
+                            {(run.status === 'active' || run.status === 'paused') && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  dispatch({
+                                    type: 'restartRun',
+                                    runId: run.id,
+                                    now: new Date().toISOString(),
+                                  })
+                                }
+                              >
+                                Restart
+                              </button>
+                            )}
+
+                            {run.status !== 'archived' ? (
+                              <button
+                                type="button"
+                                onClick={() => dispatch({ type: 'archiveRun', runId: run.id })}
+                              >
+                                Archive
+                              </button>
+                            ) : null}
+
                             <button
                               type="button"
-                              onClick={() => dispatch({ type: 'archiveRun', runId: run.id })}
+                              className="btn-danger"
+                              onClick={() => handleDeleteRun(run.id, run.templateName)}
                             >
-                              Archive
+                              Delete
                             </button>
-                          ) : null}
-
-                          <button
-                            type="button"
-                            className="btn-danger"
-                            onClick={() => handleDeleteRun(run.id, run.templateName)}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )
+            })}
           </article>
         </section>
       )}

@@ -8,6 +8,8 @@ export type ProgressionType = 'weight' | 'reps'
 
 export type ProgressionBasis = 'trackSessions' | 'successfulTrackSessions'
 
+export type ProgressionFrequencyUnit = 'session' | 'week'
+
 export type ExerciseDifficulty = 'easy' | 'okay' | 'hard'
 
 export interface ExerciseReference {
@@ -20,6 +22,7 @@ export interface ProgressionRule {
   type: ProgressionType
   amount: number
   frequency: number
+  frequencyUnit?: ProgressionFrequencyUnit
   basis: ProgressionBasis
   maxValue?: number
   minValue?: number
@@ -33,6 +36,7 @@ export interface ExerciseTemplate {
   reps: string
   plannedWeight?: number
   weightUnit?: string
+  plannedLoadLabel?: string
   progressionRule?: ProgressionRule
   note?: string
   reference?: ExerciseReference
@@ -122,6 +126,7 @@ export interface PlannedExercise {
   reps: string
   plannedWeight?: number
   weightUnit?: string
+  plannedLoadLabel?: string
   progressionNote?: string
   nextTargetHint?: string
   note?: string
