@@ -57,6 +57,29 @@ function clamp(value: number, minValue?: number, maxValue?: number): number {
   return output
 }
 
+function formatNumber(value: number): string {
+  return Number(value.toFixed(2)).toString()
+}
+
+function buildPlannedLoadLabel(
+  exercise: ExerciseTemplate,
+  plannedWeight: number,
+  plannedWeightPerSide?: number,
+): string {
+  const unit = exercise.weightUnit ?? 'kg'
+
+  if (exercise.isBodyweightLoad) {
+    return `body + ${formatNumber(plannedWeight)} ${unit}`
+  }
+
+  const totalLabel = `${formatNumber(plannedWeight)} ${unit}`.trim()
+  if (typeof plannedWeightPerSide === 'number') {
+    return `${totalLabel} (${formatNumber(plannedWeightPerSide)})`
+  }
+
+  return totalLabel
+}
+
 function parseRepsRange(reps: string): { start: number; end: number } | null {
   const value = reps.trim()
   const rangeMatch = value.match(/^(\d+)\s*-\s*(\d+)$/)
@@ -126,7 +149,9 @@ export function getPlannedExercise(
     sets: exercise.sets,
     reps: exercise.reps,
     plannedWeight: exercise.plannedWeight,
+    plannedWeightPerSide: exercise.plannedWeightPerSide,
     weightUnit: exercise.weightUnit,
+    isBodyweightLoad: exercise.isBodyweightLoad,
     plannedLoadLabel: exercise.plannedLoadLabel,
     note: exercise.note,
     reference: exercise.reference,
@@ -150,7 +175,25 @@ export function getPlannedExercise(
       rule.minValue,
       rule.maxValue,
     )
+
+    let progressedPerSide: number | undefined
+    if (typeof exercise.plannedWeightPerSide === 'number') {
+      if (typeof rule.amountPerSide === 'number') {
+        progressedPerSide = Number(
+          (exercise.plannedWeightPerSide + steps * rule.amountPerSide).toFixed(2),
+        )
+      } else {
+        progressedPerSide = Number((progressedWeight / 2).toFixed(2))
+      }
+    }
+
     planned.plannedWeight = Number(progressedWeight.toFixed(2))
+    planned.plannedWeightPerSide = progressedPerSide
+    planned.plannedLoadLabel = buildPlannedLoadLabel(
+      exercise,
+      planned.plannedWeight,
+      progressedPerSide,
+    )
     planned.nextTargetHint =
       rule.frequency > 0
         ? `Next increase in ${getSessionsUntilNext(progressionSessionCount, rule.frequency)} ${getFrequencyUnitLabel(rule, getSessionsUntilNext(progressionSessionCount, rule.frequency))}`

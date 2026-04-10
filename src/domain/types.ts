@@ -21,6 +21,7 @@ export interface ExerciseReference {
 export interface ProgressionRule {
   type: ProgressionType
   amount: number
+  amountPerSide?: number
   frequency: number
   frequencyUnit?: ProgressionFrequencyUnit
   basis: ProgressionBasis
@@ -35,7 +36,9 @@ export interface ExerciseTemplate {
   sets: string
   reps: string
   plannedWeight?: number
+  plannedWeightPerSide?: number
   weightUnit?: string
+  isBodyweightLoad?: boolean
   plannedLoadLabel?: string
   progressionRule?: ProgressionRule
   note?: string
@@ -125,7 +128,9 @@ export interface PlannedExercise {
   sets: string
   reps: string
   plannedWeight?: number
+  plannedWeightPerSide?: number
   weightUnit?: string
+  isBodyweightLoad?: boolean
   plannedLoadLabel?: string
   progressionNote?: string
   nextTargetHint?: string

@@ -51,8 +51,20 @@ export function formatPlannedWeight(exercise: PlannedExercise): string {
     return exercise.plannedLoadLabel
   }
 
+  if (exercise.isBodyweightLoad) {
+    if (typeof exercise.plannedWeight === 'number') {
+      return `body + ${exercise.plannedWeight} ${exercise.weightUnit ?? 'kg'}`
+    }
+
+    return 'body'
+  }
+
   if (typeof exercise.plannedWeight !== 'number') {
     return '-'
+  }
+
+  if (typeof exercise.plannedWeightPerSide === 'number') {
+    return `${exercise.plannedWeight} ${exercise.weightUnit ?? ''} (${exercise.plannedWeightPerSide})`.trim()
   }
 
   return `${exercise.plannedWeight} ${exercise.weightUnit ?? ''}`.trim()
