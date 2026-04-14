@@ -133,6 +133,7 @@ describe('logic helpers', () => {
 
     const planned = buildPlannedSession(run, template, workoutLogs)
     expect(planned.exercises[0].plannedWeight).toBe(1)
+    expect(planned.exercises[0].plannedWeightPerSide).toBeUndefined()
     expect(planned.exercises[0].plannedLoadLabel).toBe('body + 1 kg')
   })
 

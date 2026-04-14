@@ -59,6 +59,15 @@ function formatPerHandValue(value: number, unit?: string): string {
 }
 
 export function formatPlannedWeightOverview(exercise: PlannedExercise): string {
+  if (exercise.isBodyweightLoad) {
+    if (typeof exercise.plannedWeight === 'number') {
+      // Overview intentionally shows the extra load only for bodyweight exercises.
+      return formatWeightValue(exercise.plannedWeight, exercise.weightUnit)
+    }
+
+    return 'body'
+  }
+
   if (typeof exercise.plannedWeightPerSide === 'number') {
     return formatPerHandValue(exercise.plannedWeightPerSide, exercise.weightUnit)
   }
@@ -66,10 +75,6 @@ export function formatPlannedWeightOverview(exercise: PlannedExercise): string {
   if (typeof exercise.plannedWeight === 'number') {
     // Overview should show only the effective working load.
     return formatWeightValue(exercise.plannedWeight, exercise.weightUnit)
-  }
-
-  if (exercise.isBodyweightLoad) {
-    return 'body'
   }
 
   if (exercise.plannedLoadLabel) {
@@ -80,16 +85,16 @@ export function formatPlannedWeightOverview(exercise: PlannedExercise): string {
 }
 
 export function formatPlannedWeightDetails(exercise: PlannedExercise): string {
-  if (typeof exercise.plannedWeightPerSide === 'number') {
-    return formatPerHandValue(exercise.plannedWeightPerSide, exercise.weightUnit)
-  }
-
   if (exercise.isBodyweightLoad) {
     if (typeof exercise.plannedWeight === 'number') {
       return `body + ${formatWeightValue(exercise.plannedWeight, exercise.weightUnit)}`
     }
 
     return 'body'
+  }
+
+  if (typeof exercise.plannedWeightPerSide === 'number') {
+    return formatPerHandValue(exercise.plannedWeightPerSide, exercise.weightUnit)
   }
 
   if (typeof exercise.plannedWeight !== 'number') {
