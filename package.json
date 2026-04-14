@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "gif:convert": "node scripts/ezgif-from-csv.mjs",
     "gif:convert:dry": "node scripts/ezgif-from-csv.mjs --dry-run",
+    "gif:convert:pages": "node scripts/ezgif-from-csv.mjs --input \"Book 2 - GIF Ready.csv\" --output-csv \"Book 2 - GIF Ready.generated.csv\" --output-dir \"public/GIF\" --csv-link-mode public-base --public-base-url \"https://rubioo0.github.io/gym_tracker/\" --public-gif-prefix \"GIF\"",
     "url:convert": "node convert-fitwill-urls.mjs"
   },
   "dependencies": {
