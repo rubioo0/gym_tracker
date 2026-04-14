@@ -568,12 +568,18 @@ function summarizeResults(results, skippedRows) {
     toConvert: results.length,
     skipped: skippedRows.length,
     converted: 0,
+    reusedLocal: 0,
     failed: 0,
   }
 
   for (const result of results) {
     if (result.status === 'converted') {
       summary.converted += 1
+      continue
+    }
+
+    if (result.status === 'reused-local') {
+      summary.reusedLocal += 1
       continue
     }
 
@@ -777,10 +783,33 @@ async function main() {
       }))
     : await runJobsWithConcurrency(effectiveJobs, options, async (job) => {
         try {
-          const conversion = await convertVideoToGif(job.sourceUrl, options)
-
           const localGifFileName = makeLocalGifFileName(job)
           const localGifPath = path.join(outputDirPath, localGifFileName)
+          const localGifPathRelative = path
+            .relative(path.dirname(outputCsvPath), localGifPath)
+            .replace(/\\/g, '/')
+
+          if (
+            options.csvLinkMode === 'public-base' &&
+            !options.overwrite &&
+            (await fileExists(localGifPath))
+          ) {
+            return {
+              ...job,
+              status: 'reused-local',
+              gifUrl: null,
+              csvReferenceUrl: buildCsvReference(null, localGifFileName, options),
+              localGifFileName,
+              localGifPath,
+              localGifPathRelative,
+              downloadState: 'existing',
+              conversionMethod: null,
+              jobFile: null,
+              error: null,
+            }
+          }
+
+          const conversion = await convertVideoToGif(job.sourceUrl, options)
           const downloadState = await downloadGif(conversion.gifUrl, localGifPath, options)
           const csvReferenceUrl = buildCsvReference(
             conversion.gifUrl,
@@ -795,9 +824,7 @@ async function main() {
             csvReferenceUrl,
             localGifFileName,
             localGifPath,
-            localGifPathRelative: path
-              .relative(path.dirname(outputCsvPath), localGifPath)
-              .replace(/\\/g, '/'),
+            localGifPathRelative,
             downloadState,
             conversionMethod: conversion.method,
             jobFile: conversion.jobFile,
@@ -821,7 +848,11 @@ async function main() {
 
   if (!options.dryRun) {
     for (const result of conversionResults) {
-      if (result.status !== 'converted' || !result.csvReferenceUrl) {
+      const hasReadyReference =
+        (result.status === 'converted' || result.status === 'reused-local') &&
+        Boolean(result.csvReferenceUrl)
+
+      if (!hasReadyReference) {
         continue
       }
 
@@ -888,6 +919,7 @@ async function main() {
 
   console.log('Completed CSV to GIF processing')
   console.log(`Converted: ${summary.converted}`)
+  console.log(`Reused local GIFs: ${summary.reusedLocal}`)
   console.log(`Failed: ${summary.failed}`)
   console.log(`Skipped (no HTTP reference): ${summary.skipped}`)
   console.log(`Manifest: ${manifestPath}`)

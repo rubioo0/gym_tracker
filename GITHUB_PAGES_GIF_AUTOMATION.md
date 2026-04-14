@@ -34,13 +34,15 @@ Triggers:
   - `Book 2 - GIF Ready.csv` changes
   - `scripts/ezgif-from-csv.mjs` changes
   - workflow file changes
+- Daily cron (`schedule`) for automatic refresh/retry
 
 Behavior:
 
 1. Runs GIF conversion.
 2. Writes GIF files to `public/GIF`.
 3. Rewrites CSV links to absolute GitHub Pages URLs.
-4. Commits updated generated CSV and GIF assets when there are changes.
+4. Reuses already-generated local GIF files in Pages mode without calling EZGIF again.
+5. Commits updated generated CSV and GIF assets when there are changes.
 
 ## Script options for Pages mode
 
@@ -60,3 +62,9 @@ node scripts/ezgif-from-csv.mjs \
 
 On static GitHub Pages hosting, runtime MP4->GIF conversion requires a backend proxy and is disabled when no proxy is configured.
 Use pre-generated GIF links for production reliability.
+
+## Daily schedule behavior
+
+- The scheduled workflow retries conversion for rows that still have no local generated GIF.
+- Rows with existing `public/GIF/*.gif` files are reused immediately (no reconversion).
+- This keeps daily runs cheap while still healing failures over time.
