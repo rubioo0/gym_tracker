@@ -19,6 +19,7 @@ import { appReducer } from './domain/reducer'
 import { SessionPlanPanel } from './components/session/SessionPlanPanel'
 import type {
   ExerciseDifficulty,
+  FocusRun,
   LogActivityInput,
   LogExerciseInput,
   ProgramMode,
@@ -72,9 +73,26 @@ function formatModeLabel(templates: ProgramTemplate[]): string {
   return 'Змішана'
 }
 
+function createPreviewRun(template: ProgramTemplate): FocusRun {
+  return {
+    id: `preview-${template.id}`,
+    templateId: template.id,
+    templateName: template.name,
+    mode: template.mode,
+    track: template.track,
+    focusTarget: template.focusTarget,
+    status: 'paused',
+    startedAt: '1970-01-01T00:00:00.000Z',
+    completedSessionCount: 0,
+    successfulSessionCount: 0,
+    nextSessionIndex: 0,
+  }
+}
+
 function App() {
   const [state, dispatch] = useReducer(appReducer, undefined, loadAppState)
   const [activeTab, setActiveTab] = useState<AppTab>('home')
+  const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null)
   const [importText, setImportText] = useState('')
   const [dataMessage, setDataMessage] = useState('')
   const [csvRawText, setCsvRawText] = useState('')
@@ -123,6 +141,36 @@ function App() {
 
     return buildPlannedSession(selectedRun, selectedTemplate)
   }, [selectedRun, selectedTemplate])
+
+  const previewTemplate = useMemo(() => {
+    if (!previewTemplateId) {
+      return null
+    }
+
+    return getTemplateById(state.programTemplates, previewTemplateId) ?? null
+  }, [previewTemplateId, state.programTemplates])
+
+  const previewRun = useMemo(() => {
+    if (!previewTemplate) {
+      return null
+    }
+
+    const existingRun = state.focusRuns
+      .filter(
+        (run) => run.templateId === previewTemplate.id && run.status !== 'archived',
+      )
+      .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))[0]
+
+    return existingRun ?? createPreviewRun(previewTemplate)
+  }, [previewTemplate, state.focusRuns])
+
+  const sessionTabPlannedSession = useMemo(() => {
+    if (!previewTemplate || !previewRun) {
+      return plannedSession
+    }
+
+    return buildPlannedSession(previewRun, previewTemplate)
+  }, [plannedSession, previewRun, previewTemplate])
 
   const planKey = plannedSession
     ? `${plannedSession.run.id}:${plannedSession.session.id}`
@@ -208,13 +256,19 @@ function App() {
 
   const lastWorkout = state.workoutLogs[0] ?? null
 
-  const upcomingProgression = plannedSession?.exercises.find(
-    (exercise) => exercise.progressionNote,
-  )
-
   const hasManualRunOverride = Boolean(
     state.selectedRunId && suggestedRun && state.selectedRunId !== suggestedRun.id,
   )
+
+  function handleTabChange(tab: AppTab): void {
+    setPreviewTemplateId(null)
+    setActiveTab(tab)
+  }
+
+  function handleOpenTemplatePlan(templateId: string): void {
+    setPreviewTemplateId(templateId)
+    setActiveTab('session')
+  }
 
   function handlePause(runId: string): void {
     const reason = window.prompt('Pause reason (optional):') ?? undefined
@@ -264,6 +318,7 @@ function App() {
       },
     })
 
+    setPreviewTemplateId(null)
     setActiveTab('home')
   }
 
@@ -376,8 +431,17 @@ function App() {
 
   function handleExportState(): void {
     const text = exportAppStateJson(state)
-    setImportText(text)
-    setDataMessage('Export generated below.')
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const fileName = `training-os-backup-${timestamp}.json`
+    const backupBlob = new Blob([text], { type: 'application/json;charset=utf-8' })
+    const backupUrl = URL.createObjectURL(backupBlob)
+    const link = document.createElement('a')
+    link.href = backupUrl
+    link.download = fileName
+    link.click()
+    window.setTimeout(() => URL.revokeObjectURL(backupUrl), 0)
+
+    setDataMessage(`Backup downloaded: ${fileName}`)
   }
 
   function handleImportState(): void {
@@ -388,7 +452,32 @@ function App() {
     }
 
     dispatch({ type: 'hydrate', payload: imported })
+    setPreviewTemplateId(null)
     setDataMessage('State imported successfully.')
+  }
+
+  async function handleImportStateFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) {
+      return
+    }
+
+    try {
+      const text = await file.text()
+      const imported = importStateFromJson(text)
+      if (!imported) {
+        setDataMessage('Import failed: invalid JSON payload in file.')
+        return
+      }
+
+      dispatch({ type: 'hydrate', payload: imported })
+      setImportText(text)
+      setPreviewTemplateId(null)
+      setDataMessage(`Imported backup file: ${file.name}`)
+    } catch {
+      setDataMessage('Failed to read backup file.')
+    }
   }
 
   async function handleCsvFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -481,7 +570,7 @@ function App() {
             key={tab.id}
             type="button"
             className={tab.id === activeTab ? 'tab tab-active' : 'tab'}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => handleTabChange(tab.id)}
           >
             {tab.label}
           </button>
@@ -507,16 +596,16 @@ function App() {
                   Exercises today: <strong>{plannedSession.exercises.length}</strong>
                 </p>
                 <div className="action-row">
-                  <button type="button" onClick={() => setActiveTab('session')}>
+                  <button type="button" onClick={() => handleTabChange('session')}>
                     View Plan
                   </button>
-                  <button type="button" onClick={() => setActiveTab('session')}>
+                  <button type="button" onClick={() => handleTabChange('session')}>
                     Start Session
                   </button>
-                  <button type="button" onClick={() => setActiveTab('log')}>
+                  <button type="button" onClick={() => handleTabChange('log')}>
                     Finish / Log Session
                   </button>
-                  <button type="button" onClick={() => setActiveTab('runs')}>
+                  <button type="button" onClick={() => handleTabChange('runs')}>
                     Пауза / Перейти на програму
                   </button>
                 </div>
@@ -551,20 +640,6 @@ function App() {
             )}
           </article>
 
-          <article className="card">
-            <h2>Progression Incoming</h2>
-            {upcomingProgression ? (
-              <>
-                <p className="next-session-title">{upcomingProgression.name}</p>
-                <p>{upcomingProgression.progressionNote}</p>
-                {upcomingProgression.nextTargetHint ? (
-                  <p>{upcomingProgression.nextTargetHint}</p>
-                ) : null}
-              </>
-            ) : (
-              <p>No progression rule in the selected next session.</p>
-            )}
-          </article>
         </section>
       )}
 
@@ -677,6 +752,12 @@ function App() {
                               }
                             >
                               Розпочати тренування
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenTemplatePlan(template.id)}
+                            >
+                              View Plan
                             </button>
                             <button
                               type="button"
@@ -887,14 +968,19 @@ function App() {
         <section className="panel-grid">
           <article className="card card-wide">
             <SessionPlanPanel
-              plannedSession={plannedSession}
-              activeRuns={activeRuns}
-              selectedRun={selectedRun}
-              hasManualRunOverride={hasManualRunOverride}
-              onSelectRun={(runId) => dispatch({ type: 'setSelectedRun', runId })}
-              onResetToSuggestedRun={() =>
+              plannedSession={sessionTabPlannedSession}
+              activeRuns={previewTemplate ? [] : activeRuns}
+              selectedRun={previewTemplate ? null : selectedRun}
+              hasManualRunOverride={previewTemplate ? false : hasManualRunOverride}
+              previewTemplateName={previewTemplate?.name ?? null}
+              onSelectRun={(runId) => {
+                setPreviewTemplateId(null)
+                dispatch({ type: 'setSelectedRun', runId })
+              }}
+              onResetToSuggestedRun={() => {
+                setPreviewTemplateId(null)
                 dispatch({ type: 'setSelectedRun', runId: null })
-              }
+              }}
             />
           </article>
         </section>
@@ -911,27 +997,118 @@ function App() {
                   Log quickly after training. Defaults are prefilled to reduce taps.
                 </p>
 
-                <table className="plan-table">
-                  <thead>
-                    <tr>
-                      <th>Exercise</th>
-                      <th>Completed</th>
-                      <th>Skipped</th>
-                      <th>Actual weight</th>
-                      <th>Difficulty</th>
-                      <th>Note</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {plannedSession.exercises.map((exercise) => {
-                      const exerciseInput =
-                        exerciseInputs.find((item) => item.exerciseId === exercise.id) ??
-                        null
+                <div className="log-desktop-table">
+                  <table className="plan-table">
+                    <thead>
+                      <tr>
+                        <th>Exercise</th>
+                        <th>Completed</th>
+                        <th>Skipped</th>
+                        <th>Actual weight</th>
+                        <th>Difficulty</th>
+                        <th>Note</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {plannedSession.exercises.map((exercise) => {
+                        const exerciseInput =
+                          exerciseInputs.find((item) => item.exerciseId === exercise.id) ??
+                          null
 
-                      return (
-                        <tr key={exercise.id}>
-                          <td>{exercise.name}</td>
-                          <td>
+                        return (
+                          <tr key={exercise.id}>
+                            <td>{exercise.name}</td>
+                            <td>
+                              <input
+                                type="checkbox"
+                                checked={exerciseInput?.completed ?? false}
+                                onChange={(event) =>
+                                  updateExerciseInput(exercise.id, {
+                                    completed: event.target.checked,
+                                    skipped: event.target.checked
+                                      ? false
+                                      : exerciseInput?.skipped ?? false,
+                                  })
+                                }
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="checkbox"
+                                checked={exerciseInput?.skipped ?? false}
+                                onChange={(event) =>
+                                  updateExerciseInput(exercise.id, {
+                                    skipped: event.target.checked,
+                                    completed: event.target.checked ? false : true,
+                                  })
+                                }
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                value={exerciseInput?.actualWeight ?? ''}
+                                onChange={(event) =>
+                                  updateExerciseInput(exercise.id, {
+                                    actualWeight:
+                                      event.target.value === ''
+                                        ? undefined
+                                        : Number(event.target.value),
+                                  })
+                                }
+                              />
+                            </td>
+                            <td>
+                              <select
+                                value={exerciseInput?.difficulty ?? ''}
+                                onChange={(event) =>
+                                  updateExerciseInput(exercise.id, {
+                                    difficulty:
+                                      event.target.value === ''
+                                        ? undefined
+                                        : (event.target.value as ExerciseDifficulty),
+                                  })
+                                }
+                              >
+                                <option value="">-</option>
+                                <option value="easy">easy</option>
+                                <option value="okay">okay</option>
+                                <option value="hard">hard</option>
+                              </select>
+                            </td>
+                            <td>
+                              <input
+                                type="text"
+                                value={exerciseInput?.note ?? ''}
+                                onChange={(event) =>
+                                  updateExerciseInput(exercise.id, {
+                                    note: event.target.value,
+                                  })
+                                }
+                              />
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="log-mobile-cards" aria-label="Exercise log cards">
+                  {plannedSession.exercises.map((exercise) => {
+                    const exerciseInput =
+                      exerciseInputs.find((item) => item.exerciseId === exercise.id) ?? null
+
+                    return (
+                      <article key={exercise.id} className="log-exercise-card">
+                        <h3>{exercise.name}</h3>
+                        <p className="muted">
+                          Sets: {exercise.sets} | Reps: {exercise.reps}
+                        </p>
+
+                        <div className="log-checkbox-grid">
+                          <label className="log-checkbox-field">
+                            Completed
                             <input
                               type="checkbox"
                               checked={exerciseInput?.completed ?? false}
@@ -944,8 +1121,10 @@ function App() {
                                 })
                               }
                             />
-                          </td>
-                          <td>
+                          </label>
+
+                          <label className="log-checkbox-field">
+                            Skipped
                             <input
                               type="checkbox"
                               checked={exerciseInput?.skipped ?? false}
@@ -956,8 +1135,12 @@ function App() {
                                 })
                               }
                             />
-                          </td>
-                          <td>
+                          </label>
+                        </div>
+
+                        <div className="log-input-grid">
+                          <label className="stacked-field">
+                            Actual weight
                             <input
                               type="number"
                               value={exerciseInput?.actualWeight ?? ''}
@@ -970,8 +1153,10 @@ function App() {
                                 })
                               }
                             />
-                          </td>
-                          <td>
+                          </label>
+
+                          <label className="stacked-field">
+                            Difficulty
                             <select
                               value={exerciseInput?.difficulty ?? ''}
                               onChange={(event) =>
@@ -988,8 +1173,10 @@ function App() {
                               <option value="okay">okay</option>
                               <option value="hard">hard</option>
                             </select>
-                          </td>
-                          <td>
+                          </label>
+
+                          <label className="stacked-field">
+                            Note
                             <input
                               type="text"
                               value={exerciseInput?.note ?? ''}
@@ -999,12 +1186,12 @@ function App() {
                                 })
                               }
                             />
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                          </label>
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
 
                 {(plannedSession.session.optionalActivities?.length ?? 0) > 0 ? (
                   <div className="activities">
@@ -1137,9 +1324,26 @@ function App() {
           <article className="card card-wide">
             <h2>Import / Data Management</h2>
             <p className="muted">
-              You can import program templates from CSV now, and still use JSON state
-              import/export for full backups.
+              Use one-tap JSON backup files to keep your training data safe between app
+              updates.
             </p>
+
+            <div className="template-group">
+              <h3>State Backup</h3>
+              <div className="action-row">
+                <button type="button" onClick={handleExportState}>
+                  Download Backup JSON
+                </button>
+                <label className="stacked-field inline-file-field">
+                  Import Backup JSON File
+                  <input
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={handleImportStateFileChange}
+                  />
+                </label>
+              </div>
+            </div>
 
             <div className="template-group">
               <h3>CSV Program Import</h3>
@@ -1240,16 +1444,13 @@ function App() {
               <button type="button" onClick={handleResetAllData}>
                 Reset All Data
               </button>
-              <button type="button" onClick={handleExportState}>
-                Export State JSON
-              </button>
               <button type="button" onClick={handleImportState}>
                 Import JSON From Box
               </button>
             </div>
 
             <label className="stacked-field">
-              State JSON
+              State JSON (legacy/manual import)
               <textarea
                 value={importText}
                 onChange={(event) => setImportText(event.target.value)}
@@ -1261,11 +1462,6 @@ function App() {
           </article>
         </section>
       )}
-
-      <footer className="footer-note">
-        Core logic decisions: global upper/lower alternation by last completed track,
-        progression based on successful run sessions, manual-seed import in MVP.
-      </footer>
     </main>
   )
 }
