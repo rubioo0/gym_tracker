@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
-import { convertVideoToGifUrl } from '../utils/ezgifClient'
+import { convertVideoToGifUrl, isGifProxyConfigured } from '../utils/ezgifClient'
 
 interface CachedGifData {
   gifUrl: string
@@ -25,6 +25,7 @@ export function useExerciseGifUrl(
   isLoading: boolean
   error: string | null
 } {
+  const canConvertMp4 = useMemo(() => isGifProxyConfigured(), [])
   const cacheKey = useMemo(() => (exerciseId ? `exerciseGifUrl:${exerciseId}` : null), [exerciseId])
 
   // Initialize from cache or from defaults
@@ -43,8 +44,11 @@ export function useExerciseGifUrl(
       console.warn('[useExerciseGifUrl] localStorage read failed:', err)
     }
 
-    return { gifUrl: null, shouldConvert: !!videoUrl?.toLowerCase().endsWith('.mp4') }
-  }, [cacheKey, videoUrl])
+    return {
+      gifUrl: null,
+      shouldConvert: canConvertMp4 && !!videoUrl?.toLowerCase().endsWith('.mp4'),
+    }
+  }, [cacheKey, videoUrl, canConvertMp4])
 
   const [gifUrl, setGifUrl] = useState<string | null>(initialState.gifUrl)
   const [isLoading, setIsLoading] = useState(initialState.shouldConvert)
@@ -103,7 +107,13 @@ export function useExerciseGifUrl(
     // 1. We have exercise ID and video URL
     // 2. It's an .mp4 file
     // 3. It's not already cached (gifUrl is null means not cached)
-    if (!exerciseId || !videoUrl || !videoUrl.toLowerCase().endsWith('.mp4') || gifUrl) {
+    if (
+      !canConvertMp4 ||
+      !exerciseId ||
+      !videoUrl ||
+      !videoUrl.toLowerCase().endsWith('.mp4') ||
+      gifUrl
+    ) {
       return
     }
 
@@ -114,7 +124,7 @@ export function useExerciseGifUrl(
     return () => {
       abortControllerRef.current?.abort()
     }
-  }, [exerciseId, videoUrl, gifUrl, convertAndCache])
+  }, [canConvertMp4, exerciseId, videoUrl, gifUrl, convertAndCache])
 
   return { gifUrl, isLoading, error }
 }

@@ -15,7 +15,7 @@ const USER_AGENT =
 const scriptPath = fileURLToPath(import.meta.url)
 const scriptDir = path.dirname(scriptPath)
 const trainingOsRoot = path.resolve(scriptDir, '..')
-const repoRoot = path.resolve(trainingOsRoot, '..')
+const defaultPublicGifDir = path.join(trainingOsRoot, 'public', 'GIF')
 
 const defaultOptions = {
   start: 0,
@@ -34,6 +34,9 @@ const defaultOptions = {
   dryRun: false,
   overwrite: false,
   encoding: 'utf-8',
+  csvLinkMode: 'ezgif',
+  publicBaseUrl: '',
+  publicGifPrefix: 'GIF',
 }
 
 function printUsage() {
@@ -47,9 +50,12 @@ Required:
 
 Optional:
   --output-csv <path>         Output CSV path (default: <input>.gif.csv)
-  --output-dir <path>         Local GIF directory (default: ../GIF)
+  --output-dir <path>         Local GIF directory (default: ./public/GIF)
   --manifest <path>           JSON report path (default: <output-csv>.manifest.json)
   --report-csv <path>         CSV report path (default: <output-csv>.report.csv)
+  --csv-link-mode <value>     CSV reference target: ezgif | public-base (default: ezgif)
+  --public-base-url <url>     Base URL for public-base mode (ex: https://rubioo0.github.io/gym_tracker/)
+  --public-gif-prefix <path>  URL prefix under public-base (default: GIF)
   --start <number>            GIF start second (default: 0)
   --end <number>              GIF end second (default: 5)
   --fps <number>              GIF fps (default: 10)
@@ -71,7 +77,7 @@ Optional:
 Examples:
   node scripts/ezgif-from-csv.mjs --input ../Book 2(РУКИ (2)).csv
   node scripts/ezgif-from-csv.mjs --input ../Book 2(РУКИ (2)).csv --limit 3 --dry-run
-  node scripts/ezgif-from-csv.mjs --input ../Book 2(РУКИ (2)).csv --output-csv ../Book 2(РУКИ (2))-gif.csv --output-dir ../GIF
+  node scripts/ezgif-from-csv.mjs --input ../Book 2(РУКИ (2)).csv --output-csv ../Book 2(РУКИ (2))-gif.csv --output-dir ./public/GIF --csv-link-mode public-base --public-base-url https://rubioo0.github.io/gym_tracker/
 `)
 }
 
@@ -521,7 +527,7 @@ function buildOutputPaths(inputPath, args) {
   )
 
   const outputCsvPath = path.resolve(args['output-csv'] ?? defaultOutputCsv)
-  const outputDirPath = path.resolve(args['output-dir'] ?? path.join(repoRoot, 'GIF'))
+  const outputDirPath = path.resolve(args['output-dir'] ?? defaultPublicGifDir)
   const manifestPath = path.resolve(args.manifest ?? `${outputCsvPath}.manifest.json`)
   const reportCsvPath = path.resolve(args['report-csv'] ?? `${outputCsvPath}.report.csv`)
 
@@ -531,6 +537,29 @@ function buildOutputPaths(inputPath, args) {
     manifestPath,
     reportCsvPath,
   }
+}
+
+function ensureTrailingSlash(value) {
+  return value.endsWith('/') ? value : `${value}/`
+}
+
+function normalizePublicPrefix(value) {
+  const normalized = String(value ?? '').trim().replace(/^\/+|\/+$/g, '')
+  return normalized.length > 0 ? normalized : 'GIF'
+}
+
+function buildCsvReference(gifUrl, localGifFileName, options) {
+  if (options.csvLinkMode === 'public-base') {
+    if (!localGifFileName) {
+      throw new Error('Missing local GIF filename for public-base mode')
+    }
+
+    const baseUrl = ensureTrailingSlash(options.publicBaseUrl)
+    const prefix = normalizePublicPrefix(options.publicGifPrefix)
+    return new URL(`${prefix}/${localGifFileName}`, baseUrl).toString()
+  }
+
+  return gifUrl
 }
 
 function summarizeResults(results, skippedRows) {
@@ -622,6 +651,20 @@ async function main() {
     dryRun: Boolean(args['dry-run']),
     overwrite: Boolean(args.overwrite),
     encoding: String(args.encoding ?? defaultOptions.encoding),
+    csvLinkMode: String(args['csv-link-mode'] ?? defaultOptions.csvLinkMode),
+    publicBaseUrl: String(args['public-base-url'] ?? defaultOptions.publicBaseUrl).trim(),
+    publicGifPrefix: String(args['public-gif-prefix'] ?? defaultOptions.publicGifPrefix),
+  }
+
+  const allowedCsvLinkModes = new Set(['ezgif', 'public-base'])
+  if (!allowedCsvLinkModes.has(options.csvLinkMode)) {
+    throw new Error(
+      `Invalid --csv-link-mode: ${options.csvLinkMode}. Use ezgif or public-base.`,
+    )
+  }
+
+  if (options.csvLinkMode === 'public-base' && !isHttpUrl(options.publicBaseUrl)) {
+    throw new Error('Option --public-base-url must be absolute http(s) URL in public-base mode')
   }
 
   if (options.end < options.start) {
@@ -637,6 +680,11 @@ async function main() {
   console.log(`Input CSV: ${path.resolve(inputPath)}`)
   console.log(`Output CSV: ${outputCsvPath}`)
   console.log(`Output GIF dir: ${outputDirPath}`)
+  console.log(`CSV link mode: ${options.csvLinkMode}`)
+  if (options.csvLinkMode === 'public-base') {
+    console.log(`Public base URL: ${options.publicBaseUrl}`)
+    console.log(`Public GIF prefix: ${normalizePublicPrefix(options.publicGifPrefix)}`)
+  }
   console.log(`Dry run: ${options.dryRun ? 'yes' : 'no'}`)
 
   const rawBytes = await fs.readFile(path.resolve(inputPath))
@@ -720,6 +768,8 @@ async function main() {
         ...job,
         status: 'dry-run-planned',
         gifUrl: null,
+        csvReferenceUrl: null,
+        localGifFileName: null,
         localGifPath: null,
         downloadState: null,
         conversionMethod: null,
@@ -732,11 +782,18 @@ async function main() {
           const localGifFileName = makeLocalGifFileName(job)
           const localGifPath = path.join(outputDirPath, localGifFileName)
           const downloadState = await downloadGif(conversion.gifUrl, localGifPath, options)
+          const csvReferenceUrl = buildCsvReference(
+            conversion.gifUrl,
+            localGifFileName,
+            options,
+          )
 
           return {
             ...job,
             status: 'converted',
             gifUrl: conversion.gifUrl,
+            csvReferenceUrl,
+            localGifFileName,
             localGifPath,
             localGifPathRelative: path
               .relative(path.dirname(outputCsvPath), localGifPath)
@@ -751,6 +808,8 @@ async function main() {
             ...job,
             status: 'failed',
             gifUrl: null,
+            csvReferenceUrl: null,
+            localGifFileName: null,
             localGifPath: null,
             localGifPathRelative: null,
             downloadState: null,
@@ -762,11 +821,11 @@ async function main() {
 
   if (!options.dryRun) {
     for (const result of conversionResults) {
-      if (result.status !== 'converted' || !result.gifUrl) {
+      if (result.status !== 'converted' || !result.csvReferenceUrl) {
         continue
       }
 
-      rows[result.rowIndex][8] = result.gifUrl
+      rows[result.rowIndex][8] = result.csvReferenceUrl
     }
 
     const outputCsv = Papa.unparse(rows, {
@@ -799,6 +858,7 @@ async function main() {
       sourceUrl: item.sourceUrl,
       status: item.status,
       gifUrl: item.gifUrl ?? '',
+      csvReferenceUrl: item.csvReferenceUrl ?? '',
       localGifPath: item.localGifPath ?? '',
       localGifPathRelative: item.localGifPathRelative ?? '',
       downloadState: item.downloadState ?? '',
@@ -812,6 +872,7 @@ async function main() {
       sourceUrl: item.sourceUrl,
       status: item.status,
       gifUrl: '',
+      csvReferenceUrl: '',
       localGifPath: '',
       localGifPathRelative: '',
       downloadState: '',

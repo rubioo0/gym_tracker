@@ -1,6 +1,6 @@
 /**
  * EZGIF Client - Browser Frontend
- * Communicates with backend proxy server at localhost:3001
+ * Communicates with backend proxy server.
  * Backend handles all direct EZGIF API calls (avoids CORS issues)
  */
 
@@ -24,7 +24,15 @@ const DEFAULT_OPTIONS: Required<EzgifOptions> = {
   retries: 2,
 }
 
-const PROXY_BASE_URL = 'http://localhost:3001'
+const DEV_PROXY_BASE_URL = 'http://localhost:3001'
+const configuredProxyBaseUrl = String(import.meta.env.VITE_GIF_PROXY_BASE_URL ?? '').trim()
+
+const PROXY_BASE_URL =
+  configuredProxyBaseUrl || (import.meta.env.DEV ? DEV_PROXY_BASE_URL : '')
+
+export function isGifProxyConfigured(): boolean {
+  return PROXY_BASE_URL.length > 0
+}
 
 /**
  * Run a function with retry logic and exponential backoff
@@ -77,6 +85,11 @@ export async function convertVideoToGifUrl(
   options?: Partial<EzgifOptions>,
   signal?: AbortSignal,
 ): Promise<string | null> {
+  if (!isGifProxyConfigured()) {
+    // On static-only deployments (e.g., GitHub Pages), no backend proxy exists.
+    return null
+  }
+
   const mergedOptions = { ...DEFAULT_OPTIONS, ...options }
 
   try {
