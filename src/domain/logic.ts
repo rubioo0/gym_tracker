@@ -1,11 +1,13 @@
 import type {
   AppState,
   ExerciseTemplate,
+  ExerciseLog,
   FocusRun,
   ProgressionRule,
   PlannedExercise,
   PlannedSession,
   ProgramTemplate,
+  WorkoutLog,
   SessionTemplate,
   TrackType,
 } from './types'
@@ -13,6 +15,10 @@ import type {
 interface ProgressionCounters {
   completedSessionCount: number
   successfulSessionCount: number
+}
+
+interface PlannedExerciseOptions {
+  latestCompletedActualWeight?: number
 }
 
 export function makeId(): string {
@@ -142,6 +148,7 @@ function getFrequencyUnitLabel(rule: ProgressionRule, count: number): string {
 export function getPlannedExercise(
   exercise: ExerciseTemplate,
   countersOrCompleted: number | ProgressionCounters,
+  options?: PlannedExerciseOptions,
 ): PlannedExercise {
   const planned: PlannedExercise = {
     id: exercise.id,
@@ -165,22 +172,47 @@ export function getPlannedExercise(
   const counters = normalizeProgressionCounters(countersOrCompleted)
   const progressionSessionCount = getProgressionSessionCount(rule, counters)
   const steps = getProgressionSteps(progressionSessionCount, rule.frequency)
+  const hasLatestCompletedActualWeight =
+    typeof options?.latestCompletedActualWeight === 'number' &&
+    Number.isFinite(options.latestCompletedActualWeight)
+
+  const shouldAdvanceFromLatestCompletedActual =
+    hasLatestCompletedActualWeight &&
+    rule.frequency > 0 &&
+    progressionSessionCount > 0 &&
+    progressionSessionCount % rule.frequency === 0
+
+  const effectiveWeightSteps = hasLatestCompletedActualWeight
+    ? shouldAdvanceFromLatestCompletedActual
+      ? 1
+      : 0
+    : steps
+
+  const basePlannedWeight = hasLatestCompletedActualWeight
+    ? (options?.latestCompletedActualWeight as number)
+    : exercise.plannedWeight
+
+  const basePlannedWeightPerSide = hasLatestCompletedActualWeight
+    ? Number(((options?.latestCompletedActualWeight as number) / 2).toFixed(2))
+    : exercise.plannedWeightPerSide
+
   planned.progressionNote =
     rule.note ??
     `${rule.type} +${rule.amount} every ${rule.frequency} ${getFrequencyUnitLabel(rule, rule.frequency)} (${rule.basis === 'successfulTrackSessions' ? 'successful' : 'completed'})`
 
-  if (rule.type === 'weight' && typeof exercise.plannedWeight === 'number') {
+  if (rule.type === 'weight' && typeof basePlannedWeight === 'number') {
     const progressedWeight = clamp(
-      exercise.plannedWeight + steps * rule.amount,
+      basePlannedWeight + effectiveWeightSteps * rule.amount,
       rule.minValue,
       rule.maxValue,
     )
 
     let progressedPerSide: number | undefined
-    if (typeof exercise.plannedWeightPerSide === 'number') {
+    if (typeof basePlannedWeightPerSide === 'number') {
       if (typeof rule.amountPerSide === 'number') {
         progressedPerSide = Number(
-          (exercise.plannedWeightPerSide + steps * rule.amountPerSide).toFixed(2),
+          (basePlannedWeightPerSide +
+            effectiveWeightSteps * rule.amountPerSide).toFixed(2),
         )
       } else {
         progressedPerSide = Number((progressedWeight / 2).toFixed(2))
@@ -217,21 +249,61 @@ export function getPlannedExercise(
   return planned
 }
 
+function getLatestCompletedActualWeight(
+  runLogs: WorkoutLog[],
+  exerciseId: string,
+): number | undefined {
+  for (const runLog of runLogs) {
+    const exerciseLog = runLog.exerciseLogs.find(
+      (candidate: ExerciseLog) => candidate.exerciseId === exerciseId,
+    )
+
+    if (!exerciseLog || !exerciseLog.completed || exerciseLog.skipped) {
+      continue
+    }
+
+    if (
+      typeof exerciseLog.actualWeight === 'number' &&
+      Number.isFinite(exerciseLog.actualWeight)
+    ) {
+      return exerciseLog.actualWeight
+    }
+  }
+
+  return undefined
+}
+
 export function buildPlannedSession(
   run: FocusRun,
   template: ProgramTemplate,
+  workoutLogs: WorkoutLog[] = [],
 ): PlannedSession {
   const session = getSessionByIndex(template, run.nextSessionIndex)
+  const runLogs = workoutLogs
+    .filter((workoutLog) => workoutLog.runId === run.id)
+    .sort((a, b) => (a.completedAt < b.completedAt ? 1 : -1))
+
   return {
     run,
     template,
     session,
-    exercises: session.exercises.map((exercise) =>
-      getPlannedExercise(exercise, {
-        completedSessionCount: run.completedSessionCount,
-        successfulSessionCount: run.successfulSessionCount,
-      }),
-    ),
+    exercises: session.exercises.map((exercise) => {
+      const latestCompletedActualWeight = getLatestCompletedActualWeight(
+        runLogs,
+        exercise.id,
+      )
+
+      return getPlannedExercise(
+        exercise,
+        {
+          completedSessionCount: run.completedSessionCount,
+          successfulSessionCount: run.successfulSessionCount,
+        },
+        {
+          latestCompletedActualWeight,
+        },
+      )
+    }),
   }
 }
 

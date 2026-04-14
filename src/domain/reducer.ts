@@ -185,7 +185,7 @@ function logSession(state: AppState, payload: LogSessionInput): AppState {
     return state
   }
 
-  const plannedSession = buildPlannedSession(run, template)
+  const plannedSession = buildPlannedSession(run, template, state.workoutLogs)
 
   const inputByExerciseId = new Map(
     payload.exerciseInputs.map((input) => [input.exerciseId, input]),

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildPlannedSession,
   getPlannedExercise,
   getSuggestedTrack,
   getSessionByIndex,
 } from './logic'
-import type { FocusRun, ProgramTemplate } from './types'
+import type { FocusRun, ProgramTemplate, WorkoutLog } from './types'
 
 describe('logic helpers', () => {
   it('applies weight progression by completed session count', () => {
@@ -54,6 +55,85 @@ describe('logic helpers', () => {
 
     expect(planned.plannedWeight).toBe(20)
     expect(planned.nextTargetHint).toContain('1 session')
+  })
+
+  it('uses latest logged actual weight as baseline for next planned load', () => {
+    const run: FocusRun = {
+      id: 'run-1',
+      templateId: 'template-1',
+      templateName: 'Template 1',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'triceps',
+      status: 'active',
+      startedAt: '2026-04-10T10:00:00.000Z',
+      completedSessionCount: 1,
+      successfulSessionCount: 1,
+      nextSessionIndex: 0,
+    }
+
+    const template: ProgramTemplate = {
+      id: 'template-1',
+      name: 'Template 1',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'triceps',
+      sessions: [
+        {
+          id: 'session-1',
+          name: 'Session 1',
+          order: 1,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'exercise-dips',
+              name: 'Parallel Bar Dips',
+              sets: '4 sets',
+              reps: '12',
+              plannedWeight: 6,
+              weightUnit: 'kg',
+              isBodyweightLoad: true,
+              progressionRule: {
+                type: 'weight',
+                amount: 1,
+                frequency: 1,
+                frequencyUnit: 'week',
+                basis: 'successfulTrackSessions',
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    const workoutLogs: WorkoutLog[] = [
+      {
+        id: 'log-1',
+        runId: 'run-1',
+        templateId: 'template-1',
+        sessionId: 'session-1',
+        sessionName: 'Session 1',
+        track: 'upper',
+        completedAt: '2026-04-10T11:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'exercise-dips',
+            exerciseName: 'Parallel Bar Dips',
+            completed: true,
+            skipped: false,
+            plannedWeight: 6,
+            actualWeight: 0,
+            weightUnit: 'kg',
+          },
+        ],
+        optionalActivities: [],
+      },
+    ]
+
+    const planned = buildPlannedSession(run, template, workoutLogs)
+    expect(planned.exercises[0].plannedWeight).toBe(1)
+    expect(planned.exercises[0].plannedLoadLabel).toBe('body + 1 kg')
   })
 
   it('applies per-side weight progression for split hand loads', () => {

@@ -3,6 +3,7 @@ import { seededProgramTemplates } from '../data/seed'
 import { createInitialState } from '../data/storage'
 import { buildPlannedSession, getTemplateById } from './logic'
 import { appReducer } from './reducer'
+import type { ProgramTemplate } from './types'
 
 describe('app reducer', () => {
   it('starts run and marks it active', () => {
@@ -54,6 +55,79 @@ describe('app reducer', () => {
     expect(logged.focusRuns[0].nextSessionIndex).toBe(1)
     expect(logged.lastCompletedTrack).toBe('upper')
     expect(logged.selectedRunId).toBeNull()
+  })
+
+  it('uses logged actual bodyweight load for next planned progression', () => {
+    const templates: ProgramTemplate[] = [
+      {
+        id: 'bodyweight-dips',
+        name: 'Bodyweight Dips',
+        mode: 'main',
+        track: 'upper',
+        focusTarget: 'triceps',
+        sessions: [
+          {
+            id: 'bodyweight-dips-s1',
+            name: 'Bodyweight Dips Session',
+            order: 1,
+            track: 'upper',
+            exercises: [
+              {
+                id: 'bodyweight-dips-ex1',
+                name: 'Бруси',
+                sets: '4 sets',
+                reps: '12',
+                plannedWeight: 6,
+                weightUnit: 'kg',
+                isBodyweightLoad: true,
+                progressionRule: {
+                  type: 'weight',
+                  amount: 1,
+                  frequency: 1,
+                  frequencyUnit: 'week',
+                  basis: 'successfulTrackSessions',
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ]
+
+    const started = appReducer(createInitialState(templates), {
+      type: 'startRun',
+      templateId: 'bodyweight-dips',
+      now: '2026-04-08T10:00:00.000Z',
+    })
+
+    const run = started.focusRuns[0]
+    const logged = appReducer(started, {
+      type: 'logSession',
+      payload: {
+        runId: run.id,
+        completedAt: '2026-04-08T11:00:00.000Z',
+        successful: true,
+        exerciseInputs: [
+          {
+            exerciseId: 'bodyweight-dips-ex1',
+            completed: true,
+            skipped: false,
+            actualWeight: 0,
+          },
+        ],
+        activityInputs: [],
+      },
+    })
+
+    const nextRun = logged.focusRuns.find((candidate) => candidate.id === run.id)
+    const template = getTemplateById(logged.programTemplates, 'bodyweight-dips')
+    if (!nextRun || !template) {
+      throw new Error('run or template missing in test')
+    }
+
+    const nextPlanned = buildPlannedSession(nextRun, template, logged.workoutLogs)
+    expect(nextPlanned.exercises[0].plannedWeight).toBe(1)
+    expect(nextPlanned.exercises[0].plannedLoadLabel).toBe('body + 1 kg')
   })
 
   it('supports logging without counting progression success', () => {
