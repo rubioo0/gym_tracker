@@ -139,8 +139,8 @@ function App() {
       return null
     }
 
-    return buildPlannedSession(selectedRun, selectedTemplate)
-  }, [selectedRun, selectedTemplate])
+    return buildPlannedSession(selectedRun, selectedTemplate, state.workoutLogs)
+  }, [selectedRun, selectedTemplate, state.workoutLogs])
 
   const previewTemplate = useMemo(() => {
     if (!previewTemplateId) {
@@ -169,8 +169,8 @@ function App() {
       return plannedSession
     }
 
-    return buildPlannedSession(previewRun, previewTemplate)
-  }, [plannedSession, previewRun, previewTemplate])
+    return buildPlannedSession(previewRun, previewTemplate, state.workoutLogs)
+  }, [plannedSession, previewRun, previewTemplate, state.workoutLogs])
 
   const planKey = plannedSession
     ? `${plannedSession.run.id}:${plannedSession.session.id}`
