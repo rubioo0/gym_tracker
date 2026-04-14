@@ -145,6 +145,14 @@ function getFrequencyUnitLabel(rule: ProgressionRule, count: number): string {
   return count === 1 ? base : `${base}s`
 }
 
+function shouldUsePerSideLoadSchema(exercise: ExerciseTemplate): boolean {
+  if (exercise.isBodyweightLoad) {
+    return false
+  }
+
+  return typeof exercise.plannedWeightPerSide === 'number'
+}
+
 export function getPlannedExercise(
   exercise: ExerciseTemplate,
   countersOrCompleted: number | ProgressionCounters,
@@ -192,9 +200,14 @@ export function getPlannedExercise(
     ? (options?.latestCompletedActualWeight as number)
     : exercise.plannedWeight
 
-  const basePlannedWeightPerSide = hasLatestCompletedActualWeight
-    ? Number(((options?.latestCompletedActualWeight as number) / 2).toFixed(2))
-    : exercise.plannedWeightPerSide
+  const usesPerSideLoadSchema = shouldUsePerSideLoadSchema(exercise)
+
+  const basePlannedWeightPerSide =
+    usesPerSideLoadSchema && hasLatestCompletedActualWeight
+      ? Number(((options?.latestCompletedActualWeight as number) / 2).toFixed(2))
+      : usesPerSideLoadSchema
+        ? exercise.plannedWeightPerSide
+        : undefined
 
   planned.progressionNote =
     rule.note ??

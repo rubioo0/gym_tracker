@@ -49,4 +49,17 @@ describe('sessionPlanUtils planned weight formatters', () => {
     expect(formatPlannedWeightOverview(exercise)).toBe('5 kg на кожну руку')
     expect(formatPlannedWeightDetails(exercise)).toBe('5 kg на кожну руку')
   })
+
+  it('keeps bodyweight format even if per-side value exists accidentally', () => {
+    const exercise = makeExercise({
+      isBodyweightLoad: true,
+      plannedWeight: 1,
+      plannedWeightPerSide: 0.5,
+      weightUnit: 'kg',
+      plannedLoadLabel: 'body + 1 kg',
+    })
+
+    expect(formatPlannedWeightOverview(exercise)).toBe('1 kg')
+    expect(formatPlannedWeightDetails(exercise)).toBe('body + 1 kg')
+  })
 })
