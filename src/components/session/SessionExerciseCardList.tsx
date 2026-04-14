@@ -41,12 +41,15 @@ export function SessionExerciseCardList({
               <div className="exercise-card-header">
                 <span className="exercise-card-order">#{index + 1}</span>
                 <span className="exercise-type-badge">{categoryLabel}</span>
-                {isActive ? <span className="exercise-active-pill">Active</span> : null}
               </div>
 
               <h3 className="exercise-card-title">{exercise.name}</h3>
 
               <div className="exercise-card-metrics">
+                <span className="exercise-chip">
+                  <strong>Sets</strong>
+                  {exercise.sets}
+                </span>
                 <span className="exercise-chip">
                   <strong>Reps</strong>
                   {exercise.reps}

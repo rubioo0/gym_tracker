@@ -8,6 +8,7 @@ interface SessionPlanPanelProps {
   activeRuns: FocusRun[]
   selectedRun: FocusRun | null
   hasManualRunOverride: boolean
+  previewTemplateName?: string | null
   onSelectRun: (runId: string) => void
   onResetToSuggestedRun: () => void
 }
@@ -17,6 +18,7 @@ export function SessionPlanPanel({
   activeRuns,
   selectedRun,
   hasManualRunOverride,
+  previewTemplateName,
   onSelectRun,
   onResetToSuggestedRun,
 }: SessionPlanPanelProps) {
@@ -89,6 +91,7 @@ export function SessionPlanPanel({
   return (
     <>
       <h2>Session Plan</h2>
+      {previewTemplateName ? <p className="note">Template preview: {previewTemplateName}</p> : null}
       {activeRuns.length > 0 ? (
         <div className="action-row">
           <label className="inline-field">
@@ -128,8 +131,6 @@ export function SessionPlanPanel({
               Active: <strong>{selectedExerciseOrder ? `#${selectedExerciseOrder}` : '-'}</strong>
             </span>
           </div>
-
-          <p className="muted">Tap an exercise to open full details.</p>
 
           {plannedSession.session.note ? (
             <p className="note">{plannedSession.session.note}</p>

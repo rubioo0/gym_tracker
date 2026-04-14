@@ -9,6 +9,10 @@ interface VersionedState {
   state: AppState
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 function normalizeState(state: Partial<AppState>): AppState {
   const focusRuns = Array.isArray(state.focusRuns)
     ? state.focusRuns.map((run) => ({
@@ -89,7 +93,9 @@ export function clearAppState(): void {
 export function exportAppStateJson(state: AppState): string {
   return JSON.stringify(
     {
+      backupVersion: 2,
       exportedAt: new Date().toISOString(),
+      storageVersion: STORAGE_VERSION,
       state,
     },
     null,
@@ -105,15 +111,35 @@ function hasProgramTemplates(value: unknown): value is { programTemplates: Progr
   return Array.isArray((value as { programTemplates?: unknown }).programTemplates)
 }
 
+function extractImportState(parsed: unknown): Partial<AppState> | null {
+  if (hasProgramTemplates(parsed)) {
+    return parsed as Partial<AppState>
+  }
+
+  if (!isRecord(parsed)) {
+    return null
+  }
+
+  if (hasProgramTemplates(parsed.state)) {
+    return parsed.state as Partial<AppState>
+  }
+
+  if (isRecord(parsed.state) && hasProgramTemplates(parsed.state.state)) {
+    return parsed.state.state as Partial<AppState>
+  }
+
+  return null
+}
+
 export function importStateFromJson(raw: string): AppState | null {
   try {
-    const parsed = JSON.parse(raw) as { state?: unknown }
-    if (!parsed.state || !hasProgramTemplates(parsed.state)) {
+    const parsed = JSON.parse(raw)
+    const extractedState = extractImportState(parsed)
+    if (!extractedState) {
       return null
     }
 
-    const state = parsed.state as Partial<AppState>
-    return normalizeState(state)
+    return normalizeState(extractedState)
   } catch {
     return null
   }
