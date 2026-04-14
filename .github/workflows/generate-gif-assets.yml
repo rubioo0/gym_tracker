@@ -21,9 +21,16 @@ on:
       - Book 2 - GIF Ready.csv
       - scripts/ezgif-from-csv.mjs
       - .github/workflows/generate-gif-assets.yml
+  schedule:
+    # Daily refresh at 02:17 UTC to retry failed or missing GIFs.
+    - cron: "17 2 * * *"
 
 permissions:
   contents: write
+
+concurrency:
+  group: gif-assets-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   generate:
