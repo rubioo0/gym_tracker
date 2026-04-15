@@ -117,7 +117,7 @@ export function SessionExerciseDetailsModal({
             ) : (
               <div className="exercise-visual-placeholder">
                 <strong>{exercise.name}</strong>
-                <p>No preview available. Use references below for technique guidance.</p>
+                <p>No preview available for this exercise.</p>
               </div>
             )}
           </div>
@@ -153,24 +153,12 @@ export function SessionExerciseDetailsModal({
               </section>
             ) : null}
 
-            <section className="exercise-section">
-              <h4>References</h4>
-              {imageUrl ? (
-                <div className="exercise-links">
-                  <a href={imageUrl} target="_blank" rel="noreferrer">
-                    Image Reference
-                  </a>
-                </div>
-              ) : (
-                <p className="muted">
-                  {videoUrl ? 'Video preview is shown above.' : 'No external references attached.'}
-                </p>
-              )}
-
-              {exercise.reference?.techniqueNote ? (
-                <p className="muted">Technique: {exercise.reference.techniqueNote}</p>
-              ) : null}
-            </section>
+            {exercise.reference?.techniqueNote ? (
+              <section className="exercise-section">
+                <h4>Technique</h4>
+                <p className="muted">{exercise.reference.techniqueNote}</p>
+              </section>
+            ) : null}
           </div>
         </div>
       </section>

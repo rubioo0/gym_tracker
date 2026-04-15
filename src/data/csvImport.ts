@@ -18,12 +18,23 @@ interface CsvImportOptions {
   durationWeeks?: number
 }
 
+export interface CsvImportMetadata {
+  templateId?: string
+  sourceFileName?: string
+  programName?: string
+  mode?: ProgramMode
+  track?: TrackType
+  focusTarget?: string
+  durationWeeks?: number
+}
+
 const DEFAULT_MODE: ProgramMode = 'main'
 const DEFAULT_TRACK: TrackType = 'upper'
 const DEFAULT_DURATION_WEEKS = 8
 const BASELINE_DURATION_WEEKS = 8
 const BASELINE_SESSION_COUNT = 12
 const SESSIONS_PER_WEEK = BASELINE_SESSION_COUNT / BASELINE_DURATION_WEEKS
+export const CSV_METADATA_ROW_PREFIX = 'training-os-metadata'
 
 interface ParsedLoadConfig {
   plannedWeight?: number
@@ -81,6 +92,29 @@ function normalizeDurationWeeks(durationWeeks: number | undefined): number {
 
 function estimateProgramSessionCount(durationWeeks: number): number {
   return Math.max(1, Math.round(durationWeeks * SESSIONS_PER_WEEK))
+}
+
+function parseProgramMode(value: string): ProgramMode | undefined {
+  switch (value.toLowerCase()) {
+    case 'main':
+    case 'travel':
+    case 'maintenance':
+    case 'backup':
+      return value.toLowerCase() as ProgramMode
+    default:
+      return undefined
+  }
+}
+
+function parseTrackType(value: string): TrackType | undefined {
+  switch (value.toLowerCase()) {
+    case 'upper':
+    case 'lower':
+    case 'custom':
+      return value.toLowerCase() as TrackType
+    default:
+      return undefined
+  }
 }
 
 function makeSlug(value: string): string {
@@ -490,6 +524,64 @@ function parseCsvRows(csvText: string): string[][] {
   }
 
   return parsed.data.map((row) => row.map((cell) => normalizeCell(cell)))
+}
+
+export function extractCsvImportMetadata(csvText: string): CsvImportMetadata {
+  const rows = parseCsvRows(csvText)
+  const metadata: CsvImportMetadata = {}
+
+  rows.forEach((row) => {
+    const prefix = normalizeCell(row[0] ?? '').toLowerCase()
+    if (prefix !== CSV_METADATA_ROW_PREFIX) {
+      return
+    }
+
+    const key = normalizeCell(row[1] ?? '').toLowerCase()
+    const value = normalizeCell(row[2] ?? '')
+    if (!key || !value) {
+      return
+    }
+
+    switch (key) {
+      case 'template-id':
+        metadata.templateId = value
+        return
+      case 'source-file-name':
+        metadata.sourceFileName = value
+        return
+      case 'program-name':
+        metadata.programName = value
+        return
+      case 'mode': {
+        const parsedMode = parseProgramMode(value)
+        if (parsedMode) {
+          metadata.mode = parsedMode
+        }
+        return
+      }
+      case 'track': {
+        const parsedTrack = parseTrackType(value)
+        if (parsedTrack) {
+          metadata.track = parsedTrack
+        }
+        return
+      }
+      case 'focus-target':
+        metadata.focusTarget = value
+        return
+      case 'duration-weeks': {
+        const parsedDuration = extractInteger(value)
+        if (typeof parsedDuration === 'number' && parsedDuration > 0) {
+          metadata.durationWeeks = Math.round(parsedDuration)
+        }
+        return
+      }
+      default:
+        return
+    }
+  })
+
+  return metadata
 }
 
 function buildExercise(

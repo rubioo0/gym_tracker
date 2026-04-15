@@ -9,6 +9,8 @@ import {
 } from './data/storage'
 import { seededProgramTemplates } from './data/seed'
 import { upsertProgramTemplateFromCsv } from './data/csvTemplateUpsert'
+import { exportProgramTemplateToCsv } from './data/csvExport'
+import { extractCsvImportMetadata } from './data/csvImport'
 import {
   buildPlannedSession,
   getActiveRuns,
@@ -444,6 +446,31 @@ function App() {
     setDataMessage(`Backup downloaded: ${fileName}`)
   }
 
+  function handleExportCsvTemplate(template: ProgramTemplate): void {
+    try {
+      const result = exportProgramTemplateToCsv(template)
+      const csvBlob = new Blob([result.csvText], {
+        type: 'text/csv;charset=utf-8',
+      })
+      const csvUrl = URL.createObjectURL(csvBlob)
+      const link = document.createElement('a')
+      link.href = csvUrl
+      link.download = result.fileName
+      link.click()
+      window.setTimeout(() => URL.revokeObjectURL(csvUrl), 0)
+
+      setDataMessage(
+        result.skippedSessionCount > 0
+          ? `CSV exported: ${result.fileName} (${result.exportedExerciseCount} exercises from the first session).`
+          : `CSV exported: ${result.fileName}`,
+      )
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown CSV export error.'
+      setDataMessage(`CSV export failed: ${message}`)
+    }
+  }
+
   function handleImportState(): void {
     const imported = importStateFromJson(importText)
     if (!imported) {
@@ -482,20 +509,48 @@ function App() {
 
   async function handleCsvFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
+    event.target.value = ''
     if (!file) {
       return
     }
 
     try {
       const text = await file.text()
-      setCsvRawText(text)
-      setCsvFileName(file.name)
+      const metadata = extractCsvImportMetadata(text)
+      const effectiveFileName = metadata.sourceFileName?.trim() || file.name
 
-      if (csvProgramName === 'Imported CSV Program') {
+      setCsvRawText(text)
+      setCsvFileName(effectiveFileName)
+
+      if (metadata.programName) {
+        setCsvProgramName(metadata.programName)
+      }
+
+      if (metadata.mode) {
+        setCsvMode(metadata.mode)
+      }
+
+      if (metadata.track) {
+        setCsvTrack(metadata.track)
+      }
+
+      if (metadata.focusTarget) {
+        setCsvFocusTarget(metadata.focusTarget)
+      }
+
+      if (typeof metadata.durationWeeks === 'number') {
+        setCsvDurationWeeks(metadata.durationWeeks)
+      }
+
+      if (!metadata.programName && csvProgramName === 'Imported CSV Program') {
         setCsvProgramName(file.name.replace(/\.[^/.]+$/, ''))
       }
 
-      setDataMessage(`Loaded CSV: ${file.name}`)
+      setDataMessage(
+        metadata.templateId
+          ? `Loaded CSV: ${file.name} (program metadata detected).`
+          : `Loaded CSV: ${file.name}`,
+      )
     } catch {
       setDataMessage('Failed to read CSV file.')
     }
@@ -762,6 +817,12 @@ function App() {
                               onClick={() => handleOpenTemplatePlan(template.id)}
                             >
                               View Plan
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleExportCsvTemplate(template)}
+                            >
+                              Export CSV
                             </button>
                             <button
                               type="button"
