@@ -154,7 +154,7 @@ describe('csv import', () => {
   })
 
   it('extracts export metadata for round-trip template updates', () => {
-    const csv = `training-os-metadata,template-id,manual-upper-1
+    const csv = `\uFEFFtraining-os-metadata,template-id,manual-upper-1
 training-os-metadata,source-file-name,Manual Upper.csv
 training-os-metadata,program-name,Manual Upper
 training-os-metadata,mode,maintenance

@@ -449,7 +449,9 @@ function App() {
   function handleExportCsvTemplate(template: ProgramTemplate): void {
     try {
       const result = exportProgramTemplateToCsv(template)
-      const csvBlob = new Blob([result.csvText], {
+      const excelFriendlyCsvText =
+        result.csvText.startsWith('\uFEFF') ? result.csvText : `\uFEFF${result.csvText}`
+      const csvBlob = new Blob([excelFriendlyCsvText], {
         type: 'text/csv;charset=utf-8',
       })
       const csvUrl = URL.createObjectURL(csvBlob)
