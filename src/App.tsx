@@ -8,7 +8,7 @@ import {
   saveAppState,
 } from './data/storage'
 import { seededProgramTemplates } from './data/seed'
-import { importProgramTemplateFromCsv } from './data/csvImport'
+import { upsertProgramTemplateFromCsv } from './data/csvTemplateUpsert'
 import {
   buildPlannedSession,
   getActiveRuns,
@@ -508,7 +508,9 @@ function App() {
     }
 
     try {
-      const importedTemplate = importProgramTemplateFromCsv(csvRawText, {
+      const result = upsertProgramTemplateFromCsv({
+        templates: state.programTemplates,
+        csvText: csvRawText,
         fileName: csvFileName || undefined,
         programName: csvProgramName,
         mode: csvMode,
@@ -517,19 +519,21 @@ function App() {
         durationWeeks: csvDurationWeeks,
       })
 
-      const nextTemplates = [
-        ...state.programTemplates,
-        importedTemplate,
-      ]
-
       dispatch({
         type: 'replaceTemplates',
-        templates: nextTemplates,
+        templates: result.nextTemplates,
       })
 
-      setDataMessage(
-        `Imported "${importedTemplate.name}" with ${importedTemplate.sessions[0].exercises.length} exercises.`,
-      )
+      if (result.operation === 'updated') {
+        setDataMessage(
+          `Updated "${result.template.name}" from ${csvFileName}: ${result.diff.updatedExercises} changed, ${result.diff.addedExercises} added, ${result.diff.removedExercises} removed, ${result.diff.preservedExerciseIds} progression IDs preserved.`,
+        )
+      } else {
+        setDataMessage(
+          `Imported "${result.template.name}" with ${result.diff.totalExercises} exercises.`,
+        )
+      }
+
       setActiveTab('runs')
     } catch (error) {
       const message =
@@ -1346,10 +1350,11 @@ function App() {
             </div>
 
             <div className="template-group">
-              <h3>CSV Program Import</h3>
+              <h3>CSV Program Import / Update</h3>
               <p className="muted">
                 Choose your template CSV (for example Book 2(...).csv), set basic
-                metadata, then import.
+                metadata, then import. Uploading the same filename updates the
+                existing imported program instead of creating a duplicate.
               </p>
 
               <label className="stacked-field">
@@ -1424,7 +1429,7 @@ function App() {
 
               <div className="action-row">
                 <button type="button" onClick={handleImportCsvTemplate}>
-                  Import CSV As Template
+                  Import / Update CSV Template
                 </button>
               </div>
             </div>
