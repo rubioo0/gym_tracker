@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { importProgramTemplateFromCsv } from './csvImport'
+import { extractCsvImportMetadata, importProgramTemplateFromCsv } from './csvImport'
 
 describe('csv import', () => {
   it('imports numbered rows into one template', () => {
@@ -151,5 +151,26 @@ describe('csv import', () => {
 
     expect(shortTemplate.sessions[0].exercises[0].progressionRule?.maxValue).toBe(30)
     expect(defaultTemplate.sessions[0].exercises[0].progressionRule?.maxValue).toBe(50)
+  })
+
+  it('extracts export metadata for round-trip template updates', () => {
+    const csv = `training-os-metadata,template-id,manual-upper-1
+training-os-metadata,source-file-name,Manual Upper.csv
+training-os-metadata,program-name,Manual Upper
+training-os-metadata,mode,maintenance
+training-os-metadata,track,custom
+training-os-metadata,focus-target,shoulders
+training-os-metadata,duration-weeks,10
+1,Barbell Curl,4 sets,12,20 kg,+2.5kg | 2session,-,-,https://example.com/curl.mp4`
+
+    const metadata = extractCsvImportMetadata(csv)
+
+    expect(metadata.templateId).toBe('manual-upper-1')
+    expect(metadata.sourceFileName).toBe('Manual Upper.csv')
+    expect(metadata.programName).toBe('Manual Upper')
+    expect(metadata.mode).toBe('maintenance')
+    expect(metadata.track).toBe('custom')
+    expect(metadata.focusTarget).toBe('shoulders')
+    expect(metadata.durationWeeks).toBe(10)
   })
 })

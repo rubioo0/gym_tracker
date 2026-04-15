@@ -1,4 +1,4 @@
-import { importProgramTemplateFromCsv } from './csvImport'
+import { extractCsvImportMetadata, importProgramTemplateFromCsv } from './csvImport'
 import type {
   ExerciseTemplate,
   ProgramMode,
@@ -225,19 +225,36 @@ function mergeExercisesByIdentity(
 export function upsertProgramTemplateFromCsv(
   options: CsvTemplateUpsertOptions,
 ): CsvTemplateUpsertResult {
-  const targetFileName = options.fileName?.trim()
-  const existingTemplate = targetFileName
+  const csvMetadata = extractCsvImportMetadata(options.csvText)
+  const targetTemplateId = csvMetadata.templateId?.trim()
+  const providedFileName = options.fileName?.trim()
+  const metadataSourceFileName = csvMetadata.sourceFileName?.trim()
+  const targetFileName = providedFileName || metadataSourceFileName
+
+  const existingTemplateById = targetTemplateId
+    ? options.templates.find((template) => template.id === targetTemplateId)
+    : undefined
+
+  const existingTemplateByFileName = targetFileName
     ? findImportedTemplateByFileName(options.templates, targetFileName)
     : undefined
+
+  const existingTemplate = existingTemplateById ?? existingTemplateByFileName
+
+  const resolvedProgramName = options.programName?.trim() || csvMetadata.programName
+  const resolvedMode = options.mode ?? csvMetadata.mode
+  const resolvedTrack = options.track ?? csvMetadata.track
+  const resolvedFocusTarget = options.focusTarget?.trim() || csvMetadata.focusTarget
+  const resolvedDurationWeeks = options.durationWeeks ?? csvMetadata.durationWeeks
 
   const importedTemplate = importProgramTemplateFromCsv(options.csvText, {
     fileName: targetFileName,
     programId: existingTemplate?.id,
-    programName: options.programName,
-    mode: options.mode,
-    track: options.track,
-    focusTarget: options.focusTarget,
-    durationWeeks: options.durationWeeks,
+    programName: resolvedProgramName,
+    mode: resolvedMode,
+    track: resolvedTrack,
+    focusTarget: resolvedFocusTarget,
+    durationWeeks: resolvedDurationWeeks,
   })
 
   if (!existingTemplate) {

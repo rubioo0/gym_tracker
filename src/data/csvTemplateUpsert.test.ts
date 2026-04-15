@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { upsertProgramTemplateFromCsv } from './csvTemplateUpsert'
+import { exportProgramTemplateToCsv } from './csvExport'
+import type { ProgramTemplate } from '../domain/types'
 
 const BASE_CSV = `1,Barbell Curl,4 sets,12,25 kg,+2.5 every 2 sessions,https://example.com/curl
 2,Hammer Curl,3 sets,10,12.5 kg,+1 every 1 session,https://example.com/hammer
@@ -79,5 +81,49 @@ describe('csv template upsert', () => {
     expect(updated.diff.addedExercises).toBe(1)
     expect(updated.diff.removedExercises).toBe(1)
     expect(updated.diff.updatedExercises).toBe(2)
+  })
+
+  it('updates existing template by exported template id metadata even if file name changes', () => {
+    const manualTemplate: ProgramTemplate = {
+      id: 'manual-upper-1',
+      name: 'Manual Upper',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'biceps',
+      sessions: [
+        {
+          id: 'manual-upper-1-session-1',
+          name: 'Upper A',
+          order: 1,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'manual-upper-1-ex-1',
+              name: 'Barbell Curl',
+              sets: '4 sets',
+              reps: '12',
+              plannedWeight: 20,
+              weightUnit: 'kg',
+            },
+          ],
+        },
+      ],
+    }
+
+    const exported = exportProgramTemplateToCsv(manualTemplate)
+    const updatedCsv = exported.csvText.replace('20 kg', '22 kg')
+
+    const updated = upsertProgramTemplateFromCsv({
+      templates: [manualTemplate],
+      csvText: updatedCsv,
+      fileName: 'renamed-manual-upper.csv',
+    })
+
+    expect(updated.operation).toBe('updated')
+    expect(updated.template.id).toBe(manualTemplate.id)
+    expect(updated.template.sessions[0].exercises[0].id).toBe('manual-upper-1-ex-1')
+    expect(updated.template.sessions[0].exercises[0].plannedWeight).toBe(22)
+    expect(updated.diff.preservedExerciseIds).toBe(1)
+    expect(updated.diff.updatedExercises).toBe(1)
   })
 })
