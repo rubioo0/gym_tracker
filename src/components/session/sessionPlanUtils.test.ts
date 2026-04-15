@@ -3,6 +3,8 @@ import type { PlannedExercise } from '../../domain/types'
 import {
   formatPlannedWeightDetails,
   formatPlannedWeightOverview,
+  getEmbeddableVideoUrl,
+  isDirectPlayableVideoUrl,
 } from './sessionPlanUtils'
 
 function makeExercise(overrides: Partial<PlannedExercise>): PlannedExercise {
@@ -61,5 +63,34 @@ describe('sessionPlanUtils planned weight formatters', () => {
 
     expect(formatPlannedWeightOverview(exercise)).toBe('1 kg')
     expect(formatPlannedWeightDetails(exercise)).toBe('body + 1 kg')
+  })
+})
+
+describe('sessionPlanUtils video helpers', () => {
+  it('converts YouTube watch URLs into embed URLs', () => {
+    expect(getEmbeddableVideoUrl('https://www.youtube.com/watch?v=abc123XYZ')).toBe(
+      'https://www.youtube.com/embed/abc123XYZ',
+    )
+  })
+
+  it('converts Vimeo URLs into embed URLs', () => {
+    expect(getEmbeddableVideoUrl('https://vimeo.com/123456789')).toBe(
+      'https://player.vimeo.com/video/123456789',
+    )
+  })
+
+  it('does not treat direct mp4 links as embeddable iframe URLs', () => {
+    expect(getEmbeddableVideoUrl('https://cdn.example.com/demo/exercise.mp4')).toBeUndefined()
+  })
+
+  it('detects direct playable video files with query params', () => {
+    expect(
+      isDirectPlayableVideoUrl('https://cdn.example.com/demo/exercise.webm?token=abc123'),
+    ).toBe(true)
+  })
+
+  it('rejects non-video pages and invalid URLs for direct playback', () => {
+    expect(isDirectPlayableVideoUrl('https://www.youtube.com/watch?v=abc123XYZ')).toBe(false)
+    expect(isDirectPlayableVideoUrl('not-a-url')).toBe(false)
   })
 })

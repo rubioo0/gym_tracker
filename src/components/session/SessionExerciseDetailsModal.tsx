@@ -1,10 +1,10 @@
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { PlannedExercise } from '../../domain/types'
 import {
   formatPlannedWeightDetails,
   getEmbeddableVideoUrl,
+  isDirectPlayableVideoUrl,
 } from './sessionPlanUtils'
-import { useExerciseGifUrl } from '../../hooks/useExerciseGifUrl'
 
 interface SessionExerciseDetailsModalProps {
   exercise: PlannedExercise | null
@@ -19,12 +19,13 @@ export function SessionExerciseDetailsModal({
 }: SessionExerciseDetailsModalProps) {
   const titleId = useId()
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const [brokenVideoSource, setBrokenVideoSource] = useState<string | null>(null)
 
-  // Call hooks at top level, before early returns
   const imageUrl = exercise?.reference?.imageUrl
   const videoUrl = exercise?.reference?.videoUrl
   const embeddableVideoUrl = getEmbeddableVideoUrl(videoUrl)
-  const { gifUrl, isLoading, error } = useExerciseGifUrl(exercise?.id, videoUrl)
+  const hasDirectPlayableVideo = isDirectPlayableVideoUrl(videoUrl)
+  const isDirectVideoBroken = !!videoUrl && brokenVideoSource === videoUrl
 
   useEffect(() => {
     if (!exercise) {
@@ -93,23 +94,6 @@ export function SessionExerciseDetailsModal({
                 alt={`${exercise.name} reference`}
                 className="exercise-visual-media"
               />
-            ) : gifUrl ? (
-              <img
-                src={gifUrl}
-                alt={`${exercise.name} GIF reference`}
-                className="exercise-visual-media"
-              />
-            ) : isLoading ? (
-              <div className="exercise-visual-loading">
-                <div className="spinner" />
-                <strong>Converting to GIF...</strong>
-                <p>This may take 10-30 seconds</p>
-              </div>
-            ) : error ? (
-              <div className="exercise-visual-placeholder">
-                <strong>{exercise.name}</strong>
-                <p>{error}</p>
-              </div>
             ) : embeddableVideoUrl ? (
               <iframe
                 src={embeddableVideoUrl}
@@ -119,10 +103,21 @@ export function SessionExerciseDetailsModal({
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               />
+            ) : hasDirectPlayableVideo && videoUrl && !isDirectVideoBroken ? (
+              <video
+                src={videoUrl}
+                className="exercise-visual-media exercise-visual-video"
+                controls
+                preload="metadata"
+                playsInline
+                onError={() => setBrokenVideoSource(videoUrl)}
+              >
+                Your browser does not support this video format.
+              </video>
             ) : (
               <div className="exercise-visual-placeholder">
                 <strong>{exercise.name}</strong>
-                <p>No image available. Use references below for technique guidance.</p>
+                <p>No preview available. Use references below for technique guidance.</p>
               </div>
             )}
           </div>

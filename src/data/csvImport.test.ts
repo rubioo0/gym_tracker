@@ -42,12 +42,12 @@ describe('csv import', () => {
     expect(exercise.progressionRule?.maxValue).toBe(35)
   })
 
-  it('stores GIF links as image references', () => {
+  it('stores image links as image references', () => {
     const csv = `1,Incline Treadmill Walk,3,12,-,-,-,-,https://cdn.example.com/walk.gif`
 
     const template = importProgramTemplateFromCsv(csv, {
-      programId: 'test-gif-reference',
-      programName: 'GIF Reference Import',
+      programId: 'test-image-reference',
+      programName: 'Image Reference Import',
       mode: 'main',
       track: 'upper',
       focusTarget: 'biceps',

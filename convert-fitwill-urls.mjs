@@ -1,19 +1,18 @@
 #!/usr/bin/env node
 /**
  * Fitwill URL Converter
- * Converts Fitwill exercise page URLs to usable alternatives for GIF conversion
+ * Converts Fitwill exercise page URLs to direct video alternatives for in-app playback
  * 
  * Usage:
  *   node convert-fitwill-urls.mjs input.csv output.csv
  * 
  * This script provides 3 options:
  * 1. Replace with sample video URLs (for testing)
- * 2. Replace with placeholder (no video/GIF)
+ * 2. Replace with placeholder (no video)
  * 3. Remove video column entirely
  */
 
 import fs from 'fs'
-import path from 'path'
 import readline from 'readline'
 
 const rl = readline.createInterface({
@@ -64,10 +63,10 @@ async function main() {
   console.log(`Total rows: ${lines.length - 1}`)
   console.log('')
   console.log('Options:')
-  console.log('1) Replace Fitwill URLs with sample test videos (for testing GIF conversion)')
-  console.log('2) Replace with placeholder text (no video/GIF)')
+  console.log('1) Replace Fitwill URLs with sample test videos (for testing playback)')
+  console.log('2) Replace with placeholder text (no video)')
   console.log('3) Remove video column entirely')
-  console.log('4) Keep as-is (Fitwill URLs will not convert to GIF)')
+  console.log('4) Keep as-is (Fitwill URLs may not play directly in all browsers)')
   console.log('')
 
   const choice = await question('Choose option (1-4): ')
@@ -133,11 +132,11 @@ async function main() {
     console.log('Next steps:')
     console.log('1. Import the converted CSV into the app')
     console.log('2. Open an exercise card')
-    console.log('3. Watch the GIF convert in real-time (10-30 seconds)')
-    console.log('4. GIFs will be cached for instant viewing on repeat visits')
+    console.log('3. Verify that videos play directly in the exercise preview')
+    console.log('4. Keep external links as fallback for any blocked sources')
   } else if (choice === '4') {
-    console.log('Note: Fitwill URLs cannot be converted to GIFs.')
-    console.log('To enable GIF conversion, you need direct video file URLs.')
+    console.log('Note: Fitwill exercise-page URLs are often HTML pages, not direct video files.')
+    console.log('For reliable in-app playback, use direct video file URLs (for example .mp4).')
     console.log('')
     console.log('Options:')
     console.log('• Extract direct URLs from Fitwill (if available in their CDN)')
