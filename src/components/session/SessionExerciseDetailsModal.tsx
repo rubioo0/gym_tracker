@@ -155,21 +155,16 @@ export function SessionExerciseDetailsModal({
 
             <section className="exercise-section">
               <h4>References</h4>
-              {videoUrl || imageUrl ? (
+              {imageUrl ? (
                 <div className="exercise-links">
-                  {videoUrl ? (
-                    <a href={videoUrl} target="_blank" rel="noreferrer">
-                      Video Reference
-                    </a>
-                  ) : null}
-                  {imageUrl ? (
-                    <a href={imageUrl} target="_blank" rel="noreferrer">
-                      Image Reference
-                    </a>
-                  ) : null}
+                  <a href={imageUrl} target="_blank" rel="noreferrer">
+                    Image Reference
+                  </a>
                 </div>
               ) : (
-                <p className="muted">No external references attached.</p>
+                <p className="muted">
+                  {videoUrl ? 'Video preview is shown above.' : 'No external references attached.'}
+                </p>
               )}
 
               {exercise.reference?.techniqueNote ? (
