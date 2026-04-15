@@ -49,7 +49,7 @@ function normalizeCell(value: unknown): string {
     return ''
   }
 
-  return value.replace(/\r/g, '').trim()
+  return value.replace(/^\uFEFF/, '').replace(/\r/g, '').trim()
 }
 
 function isEmptyOrDash(value: string): boolean {
