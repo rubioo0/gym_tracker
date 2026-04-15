@@ -117,6 +117,25 @@ function cleanPathSegment(value: string): string {
   return value.replace(/^\//, '').split('/')[0]
 }
 
+const DIRECT_PLAYABLE_VIDEO_PATH_PATTERN = /\.(mp4|webm|ogg|ogv|mov|m4v)$/i
+
+export function isDirectPlayableVideoUrl(rawUrl: string | undefined): boolean {
+  if (!rawUrl) {
+    return false
+  }
+
+  try {
+    const url = new URL(rawUrl)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return false
+    }
+
+    return DIRECT_PLAYABLE_VIDEO_PATH_PATTERN.test(url.pathname)
+  } catch {
+    return false
+  }
+}
+
 export function getEmbeddableVideoUrl(
   rawUrl: string | undefined,
 ): string | undefined {
