@@ -13,6 +13,30 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
+function normalizeTemplateProgressionUnits(
+  templates: ProgramTemplate[],
+): ProgramTemplate[] {
+  return templates.map((template) => ({
+    ...template,
+    sessions: template.sessions.map((session) => ({
+      ...session,
+      exercises: session.exercises.map((exercise) => {
+        if (!exercise.progressionRule || exercise.progressionRule.frequencyUnit !== 'week') {
+          return exercise
+        }
+
+        return {
+          ...exercise,
+          progressionRule: {
+            ...exercise.progressionRule,
+            frequencyUnit: 'session',
+          },
+        }
+      }),
+    })),
+  }))
+}
+
 function normalizeState(state: Partial<AppState>): AppState {
   const focusRuns = Array.isArray(state.focusRuns)
     ? state.focusRuns.map((run) => ({
@@ -39,7 +63,7 @@ function normalizeState(state: Partial<AppState>): AppState {
 
   return {
     programTemplates: Array.isArray(state.programTemplates)
-      ? state.programTemplates
+      ? normalizeTemplateProgressionUnits(state.programTemplates)
       : seededProgramTemplates,
     focusRuns,
     workoutLogs,
