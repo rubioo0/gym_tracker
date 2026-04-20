@@ -58,7 +58,7 @@ describe('csv import', () => {
     expect(exercise.reference?.videoUrl).toBeUndefined()
   })
 
-  it('parses explicit progression format with week frequency', () => {
+  it('normalizes explicit progression format to session frequency', () => {
     const csv = `1,Dumbbell Curl,4 sets,12,body + 10 kg,+5kg (2.5) | 2week,https://example.com/curl`
 
     const template = importProgramTemplateFromCsv(csv, {
@@ -73,9 +73,9 @@ describe('csv import', () => {
     expect(exercise.progressionRule?.amount).toBe(5)
     expect(exercise.progressionRule?.amountPerSide).toBe(2.5)
     expect(exercise.progressionRule?.frequency).toBe(2)
-    expect(exercise.progressionRule?.frequencyUnit).toBe('week')
+    expect(exercise.progressionRule?.frequencyUnit).toBe('session')
     expect(exercise.progressionRule?.note).toContain('(2.5)')
-    expect(exercise.progressionRule?.maxValue).toBe(30)
+    expect(exercise.progressionRule?.maxValue).toBe(40)
   })
 
   it('parses supported load formats from Навантаження column', () => {
@@ -125,7 +125,7 @@ describe('csv import', () => {
     expect(exercise.plannedLoadLabel).toBe('10 kg (5)')
     expect(exercise.progressionRule?.amount).toBe(5)
     expect(exercise.progressionRule?.amountPerSide).toBe(2.5)
-    expect(exercise.progressionRule?.maxValue).toBe(30)
+    expect(exercise.progressionRule?.maxValue).toBe(40)
   })
 
   it('scales automatic max value by selected duration', () => {
@@ -149,12 +149,13 @@ describe('csv import', () => {
       durationWeeks: 8,
     })
 
-    expect(shortTemplate.sessions[0].exercises[0].progressionRule?.maxValue).toBe(30)
-    expect(defaultTemplate.sessions[0].exercises[0].progressionRule?.maxValue).toBe(50)
+    expect(shortTemplate.sessions[0].exercises[0].progressionRule?.maxValue).toBe(40)
+    expect(defaultTemplate.sessions[0].exercises[0].progressionRule?.maxValue).toBe(70)
   })
 
   it('extracts export metadata for round-trip template updates', () => {
     const csv = `\uFEFFtraining-os-metadata,template-id,manual-upper-1
+training-os-metadata,exported-session-id,manual-upper-1-session-1
 training-os-metadata,source-file-name,Manual Upper.csv
 training-os-metadata,program-name,Manual Upper
 training-os-metadata,mode,maintenance
@@ -166,6 +167,7 @@ training-os-metadata,duration-weeks,10
     const metadata = extractCsvImportMetadata(csv)
 
     expect(metadata.templateId).toBe('manual-upper-1')
+    expect(metadata.exportedSessionId).toBe('manual-upper-1-session-1')
     expect(metadata.sourceFileName).toBe('Manual Upper.csv')
     expect(metadata.programName).toBe('Manual Upper')
     expect(metadata.mode).toBe('maintenance')

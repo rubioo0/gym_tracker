@@ -576,18 +576,47 @@ function App() {
         durationWeeks: csvDurationWeeks,
       })
 
+      if (result.status === 'conflict') {
+        const details = result.details
+        const conflictParts: string[] = []
+
+        if (details.templateId && details.resolvedTemplateIdByTemplateId) {
+          conflictParts.push(
+            `template-id "${details.templateId}" -> "${details.resolvedTemplateIdByTemplateId}"`,
+          )
+        }
+
+        if (
+          details.metadataSourceFileName &&
+          details.resolvedTemplateIdBySourceFileName
+        ) {
+          conflictParts.push(
+            `source-file-name "${details.metadataSourceFileName}" -> "${details.resolvedTemplateIdBySourceFileName}"`,
+          )
+        }
+
+        const conflictDetails =
+          conflictParts.length > 0 ? ` (${conflictParts.join('; ')})` : ''
+
+        setDataMessage(`CSV import blocked: ${result.message}${conflictDetails}`)
+        return
+      }
+
       dispatch({
         type: 'replaceTemplates',
         templates: result.nextTemplates,
       })
 
+      const warningSuffix =
+        result.warnings.length > 0 ? ` Warnings: ${result.warnings.join(' ')}` : ''
+
       if (result.operation === 'updated') {
         setDataMessage(
-          `Updated "${result.template.name}" from ${csvFileName}: ${result.diff.updatedExercises} changed, ${result.diff.addedExercises} added, ${result.diff.removedExercises} removed, ${result.diff.preservedExerciseIds} progression IDs preserved.`,
+          `Updated "${result.template.name}" from ${csvFileName}: ${result.diff.updatedExercises} changed, ${result.diff.addedExercises} added, ${result.diff.removedExercises} removed, ${result.diff.preservedExerciseIds} progression IDs preserved, ${result.diff.preservedSessions} non-imported sessions preserved.${warningSuffix}`,
         )
       } else {
         setDataMessage(
-          `Imported "${result.template.name}" with ${result.diff.totalExercises} exercises.`,
+          `Imported "${result.template.name}" with ${result.diff.totalExercises} exercises.${warningSuffix}`,
         )
       }
 

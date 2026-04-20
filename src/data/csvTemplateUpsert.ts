@@ -3,6 +3,7 @@ import type {
   ExerciseTemplate,
   ProgramMode,
   ProgramTemplate,
+  SessionTemplate,
   TrackType,
 } from '../domain/types'
 
@@ -25,14 +26,36 @@ export interface CsvTemplateDiff {
   removedExercises: number
   updatedExercises: number
   totalExercises: number
+  preservedSessions: number
 }
 
-export interface CsvTemplateUpsertResult {
+interface CsvTemplateUpsertSuccessResult {
+  status: 'success'
   operation: 'created' | 'updated'
   template: ProgramTemplate
   nextTemplates: ProgramTemplate[]
   diff: CsvTemplateDiff
+  warnings: string[]
 }
+
+interface CsvTemplateIdentityConflictDetails {
+  templateId?: string
+  metadataSourceFileName?: string
+  providedFileName?: string
+  resolvedTemplateIdByTemplateId?: string
+  resolvedTemplateIdBySourceFileName?: string
+}
+
+interface CsvTemplateUpsertConflictResult {
+  status: 'conflict'
+  reason: 'template-identity-mismatch'
+  message: string
+  details: CsvTemplateIdentityConflictDetails
+}
+
+export type CsvTemplateUpsertResult =
+  | CsvTemplateUpsertSuccessResult
+  | CsvTemplateUpsertConflictResult
 
 interface ExerciseMergeResult {
   exercises: ExerciseTemplate[]
@@ -40,6 +63,12 @@ interface ExerciseMergeResult {
   addedExercises: number
   removedExercises: number
   updatedExercises: number
+}
+
+interface SessionResolutionResult {
+  sessionIndex: number
+  session: SessionTemplate
+  warnings: string[]
 }
 
 function normalizeFileName(fileName: string): string {
@@ -88,10 +117,15 @@ export function findImportedTemplateByFileName(
 function extractExerciseNumber(exerciseId: string, templateId: string): string | undefined {
   const prefix = `${templateId}-ex-`
   if (!exerciseId.startsWith(prefix)) {
-    return undefined
+    const fallbackMatch = exerciseId.match(/(?:^|-)ex-(\d+)$/)
+    return fallbackMatch?.[1]
   }
 
   const suffix = exerciseId.slice(prefix.length).trim()
+  if (!/^\d+$/.test(suffix)) {
+    return undefined
+  }
+
   return suffix.length > 0 ? suffix : undefined
 }
 
@@ -116,12 +150,11 @@ function buildExerciseSnapshot(exercise: ExerciseTemplate): string {
 }
 
 function mergeExercisesByIdentity(
-  existingTemplate: ProgramTemplate,
-  importedTemplate: ProgramTemplate,
+  existingTemplateId: string,
+  importedTemplateId: string,
+  existingExercises: ExerciseTemplate[],
+  importedExercises: ExerciseTemplate[],
 ): ExerciseMergeResult {
-  const existingExercises = existingTemplate.sessions[0]?.exercises ?? []
-  const importedExercises = importedTemplate.sessions[0]?.exercises ?? []
-
   if (existingExercises.length === 0) {
     return {
       exercises: importedExercises,
@@ -142,19 +175,21 @@ function mergeExercisesByIdentity(
     }
   }
 
-  const existingByNumber = new Map<string, ExerciseTemplate>()
+  const existingByNumber = new Map<string, ExerciseTemplate[]>()
   const existingByName = new Map<string, ExerciseTemplate[]>()
 
   existingExercises.forEach((exercise) => {
-    const exerciseNumber = extractExerciseNumber(exercise.id, existingTemplate.id)
+    const exerciseNumber = extractExerciseNumber(exercise.id, existingTemplateId)
     if (exerciseNumber) {
-      existingByNumber.set(exerciseNumber, exercise)
+      const numberBucket = existingByNumber.get(exerciseNumber) ?? []
+      numberBucket.push(exercise)
+      existingByNumber.set(exerciseNumber, numberBucket)
     }
 
     const normalizedName = normalizeExerciseNameForMatch(exercise.name)
-    const bucket = existingByName.get(normalizedName) ?? []
-    bucket.push(exercise)
-    existingByName.set(normalizedName, bucket)
+    const nameBucket = existingByName.get(normalizedName) ?? []
+    nameBucket.push(exercise)
+    existingByName.set(normalizedName, nameBucket)
   })
 
   const usedExistingExerciseIds = new Set<string>()
@@ -166,25 +201,30 @@ function mergeExercisesByIdentity(
     const normalizedImportedName = normalizeExerciseNameForMatch(importedExercise.name)
     const importedExerciseNumber = extractExerciseNumber(
       importedExercise.id,
-      importedTemplate.id,
+      importedTemplateId,
     )
 
     let matchedExisting: ExerciseTemplate | undefined
 
     if (importedExerciseNumber) {
-      const candidateByNumber = existingByNumber.get(importedExerciseNumber)
-      if (
-        candidateByNumber &&
-        !usedExistingExerciseIds.has(candidateByNumber.id) &&
-        normalizeExerciseNameForMatch(candidateByNumber.name) === normalizedImportedName
-      ) {
-        matchedExisting = candidateByNumber
-      }
+      const candidatesByNumber = existingByNumber.get(importedExerciseNumber) ?? []
+      matchedExisting = candidatesByNumber.find(
+        (candidate) =>
+          !usedExistingExerciseIds.has(candidate.id) &&
+          normalizeExerciseNameForMatch(candidate.name) === normalizedImportedName,
+      )
     }
 
     if (!matchedExisting) {
       const candidatesByName = existingByName.get(normalizedImportedName) ?? []
       matchedExisting = candidatesByName.find(
+        (candidate) => !usedExistingExerciseIds.has(candidate.id),
+      )
+    }
+
+    if (!matchedExisting && importedExerciseNumber) {
+      const candidatesByNumber = existingByNumber.get(importedExerciseNumber) ?? []
+      matchedExisting = candidatesByNumber.find(
         (candidate) => !usedExistingExerciseIds.has(candidate.id),
       )
     }
@@ -222,6 +262,71 @@ function mergeExercisesByIdentity(
   }
 }
 
+function resolveTargetSession(
+  existingTemplate: ProgramTemplate,
+  exportedSessionId: string | undefined,
+): SessionResolutionResult {
+  const warnings: string[] = []
+
+  if (existingTemplate.sessions.length === 0) {
+    throw new Error(
+      `Template "${existingTemplate.name}" has no sessions available for CSV update.`,
+    )
+  }
+
+  if (exportedSessionId) {
+    const matchedSessionIndex = existingTemplate.sessions.findIndex(
+      (session) => session.id === exportedSessionId,
+    )
+
+    if (matchedSessionIndex >= 0) {
+      return {
+        sessionIndex: matchedSessionIndex,
+        session: existingTemplate.sessions[matchedSessionIndex],
+        warnings,
+      }
+    }
+
+    warnings.push(
+      `CSV references session "${exportedSessionId}" that was not found. Updated the first session instead.`,
+    )
+  }
+
+  if (existingTemplate.sessions.length > 1 && !exportedSessionId) {
+    warnings.push(
+      'CSV did not include exported session metadata. Updated the first session and preserved remaining sessions.',
+    )
+  }
+
+  return {
+    sessionIndex: 0,
+    session: existingTemplate.sessions[0],
+    warnings,
+  }
+}
+
+function createTemplateIdentityConflict(
+  templateId: string,
+  metadataSourceFileName: string,
+  providedFileName: string | undefined,
+  existingTemplateById: ProgramTemplate,
+  existingTemplateByMetadataFileName: ProgramTemplate,
+): CsvTemplateUpsertConflictResult {
+  return {
+    status: 'conflict',
+    reason: 'template-identity-mismatch',
+    message:
+      'CSV metadata points to different templates by template-id and source file name. Resolve the mismatch before updating.',
+    details: {
+      templateId,
+      metadataSourceFileName,
+      providedFileName,
+      resolvedTemplateIdByTemplateId: existingTemplateById.id,
+      resolvedTemplateIdBySourceFileName: existingTemplateByMetadataFileName.id,
+    },
+  }
+}
+
 export function upsertProgramTemplateFromCsv(
   options: CsvTemplateUpsertOptions,
 ): CsvTemplateUpsertResult {
@@ -229,17 +334,42 @@ export function upsertProgramTemplateFromCsv(
   const targetTemplateId = csvMetadata.templateId?.trim()
   const providedFileName = options.fileName?.trim()
   const metadataSourceFileName = csvMetadata.sourceFileName?.trim()
-  const targetFileName = providedFileName || metadataSourceFileName
+  const exportedSessionId = csvMetadata.exportedSessionId?.trim()
+  const targetFileName = metadataSourceFileName || providedFileName
 
   const existingTemplateById = targetTemplateId
     ? options.templates.find((template) => template.id === targetTemplateId)
     : undefined
 
-  const existingTemplateByFileName = targetFileName
-    ? findImportedTemplateByFileName(options.templates, targetFileName)
+  const existingTemplateByMetadataFileName = metadataSourceFileName
+    ? findImportedTemplateByFileName(options.templates, metadataSourceFileName)
     : undefined
 
-  const existingTemplate = existingTemplateById ?? existingTemplateByFileName
+  if (
+    targetTemplateId &&
+    metadataSourceFileName &&
+    existingTemplateById &&
+    existingTemplateByMetadataFileName &&
+    existingTemplateById.id !== existingTemplateByMetadataFileName.id
+  ) {
+    return createTemplateIdentityConflict(
+      targetTemplateId,
+      metadataSourceFileName,
+      providedFileName,
+      existingTemplateById,
+      existingTemplateByMetadataFileName,
+    )
+  }
+
+  const existingTemplateByProvidedFileName =
+    !metadataSourceFileName && providedFileName
+      ? findImportedTemplateByFileName(options.templates, providedFileName)
+      : undefined
+
+  const existingTemplate =
+    existingTemplateById ??
+    existingTemplateByMetadataFileName ??
+    existingTemplateByProvidedFileName
 
   const resolvedProgramName = options.programName?.trim() || csvMetadata.programName
   const resolvedMode = options.mode ?? csvMetadata.mode
@@ -260,6 +390,7 @@ export function upsertProgramTemplateFromCsv(
   if (!existingTemplate) {
     const totalExercises = importedTemplate.sessions[0]?.exercises.length ?? 0
     return {
+      status: 'success',
       operation: 'created',
       template: importedTemplate,
       nextTemplates: [...options.templates, importedTemplate],
@@ -269,27 +400,39 @@ export function upsertProgramTemplateFromCsv(
         removedExercises: 0,
         updatedExercises: 0,
         totalExercises,
+        preservedSessions: 0,
       },
+      warnings: [],
     }
   }
 
-  const mergeResult = mergeExercisesByIdentity(existingTemplate, importedTemplate)
-  const existingSessionId = existingTemplate.sessions[0]?.id
+  const importedSession = importedTemplate.sessions[0]
+  if (!importedSession) {
+    throw new Error('CSV import did not produce a valid session payload.')
+  }
+
+  const sessionResolution = resolveTargetSession(existingTemplate, exportedSessionId)
+  const mergeResult = mergeExercisesByIdentity(
+    existingTemplate.id,
+    importedTemplate.id,
+    sessionResolution.session.exercises,
+    importedSession.exercises,
+  )
+
+  const mergedTargetSession: SessionTemplate = {
+    ...sessionResolution.session,
+    exercises: mergeResult.exercises,
+  }
+
+  const mergedSessions = existingTemplate.sessions.map((session, index) =>
+    index === sessionResolution.sessionIndex ? mergedTargetSession : session,
+  )
 
   const mergedTemplate: ProgramTemplate = {
+    ...existingTemplate,
     ...importedTemplate,
     id: existingTemplate.id,
-    sessions: importedTemplate.sessions.map((session, index) => {
-      if (index !== 0) {
-        return session
-      }
-
-      return {
-        ...session,
-        id: existingSessionId ?? session.id,
-        exercises: mergeResult.exercises,
-      }
-    }),
+    sessions: mergedSessions,
   }
 
   const nextTemplates = options.templates.map((template) =>
@@ -297,6 +440,7 @@ export function upsertProgramTemplateFromCsv(
   )
 
   return {
+    status: 'success',
     operation: 'updated',
     template: mergedTemplate,
     nextTemplates,
@@ -306,6 +450,8 @@ export function upsertProgramTemplateFromCsv(
       removedExercises: mergeResult.removedExercises,
       updatedExercises: mergeResult.updatedExercises,
       totalExercises: mergeResult.exercises.length,
+      preservedSessions: Math.max(0, mergedSessions.length - 1),
     },
+    warnings: sessionResolution.warnings,
   }
 }
