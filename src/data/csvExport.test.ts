@@ -71,6 +71,11 @@ describe('csv export', () => {
 
     expect(parsed.data[0]).toEqual(['training-os-metadata', 'export-version', '1'])
     expect(parsed.data[1]).toEqual(['training-os-metadata', 'template-id', 'manual-upper-1'])
+    expect(parsed.data[2]).toEqual([
+      'training-os-metadata',
+      'exported-session-id',
+      'manual-upper-1-session-1',
+    ])
 
     const firstExerciseRow = parsed.data.find((row) => row[0] === '1')
     expect(firstExerciseRow).toBeDefined()

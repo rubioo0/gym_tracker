@@ -34,10 +34,12 @@ function formatNumber(value: number): string {
 }
 
 function sanitizeFileName(fileName: string): string {
-  const sanitized = fileName
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
-    .replace(/\s+/g, ' ')
-    .trim()
+  const withoutReservedChars = fileName.replace(/[<>:"/\\|?*]/g, '-')
+  const withoutControlChars = Array.from(withoutReservedChars)
+    .map((char) => (char.charCodeAt(0) < 32 ? '-' : char))
+    .join('')
+
+  const sanitized = withoutControlChars.replace(/\s+/g, ' ').trim()
 
   if (!sanitized) {
     return 'exported-program.csv'
@@ -142,10 +144,15 @@ function buildExerciseRow(exercise: ExerciseTemplate, order: number): string[] {
   ]
 }
 
-function buildMetadataRows(template: ProgramTemplate, sourceFileName: string): string[][] {
+function buildMetadataRows(
+  template: ProgramTemplate,
+  sourceFileName: string,
+  exportedSessionId: string,
+): string[][] {
   return [
     [CSV_METADATA_ROW_PREFIX, 'export-version', '1'],
     [CSV_METADATA_ROW_PREFIX, 'template-id', template.id],
+    [CSV_METADATA_ROW_PREFIX, 'exported-session-id', exportedSessionId],
     [CSV_METADATA_ROW_PREFIX, 'program-name', template.name],
     [CSV_METADATA_ROW_PREFIX, 'mode', template.mode],
     [CSV_METADATA_ROW_PREFIX, 'track', template.track],
@@ -167,7 +174,7 @@ export function exportProgramTemplateToCsv(
   )
 
   const rows: string[][] = [
-    ...buildMetadataRows(template, sourceFileName),
+    ...buildMetadataRows(template, sourceFileName, firstSession.id),
     CSV_HEADER_ROW,
     ...firstSession.exercises.map((exercise, index) => buildExerciseRow(exercise, index + 1)),
   ]

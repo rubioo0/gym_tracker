@@ -20,6 +20,7 @@ interface CsvImportOptions {
 
 export interface CsvImportMetadata {
   templateId?: string
+  exportedSessionId?: string
   sourceFileName?: string
   programName?: string
   mode?: ProgramMode
@@ -338,16 +339,11 @@ function parseProgressionFrequency(
   const pipeMatch = progressionRaw.match(/\|\s*(\d+)\s*([a-zA-Zа-яА-ЯіІїЇєЄґҐ]*)/)
   if (pipeMatch) {
     const parsedFrequency = Number(pipeMatch[1])
-    const token = (pipeMatch[2] ?? '').toLowerCase()
-    const frequencyUnit: ProgressionFrequencyUnit =
-      token.includes('week') || token.includes('wk') || token.startsWith('тиж')
-        ? 'week'
-        : 'session'
 
     if (Number.isInteger(parsedFrequency) && parsedFrequency > 0) {
       return {
         frequency: parsedFrequency,
-        frequencyUnit,
+        frequencyUnit: 'session',
       }
     }
   }
@@ -362,15 +358,9 @@ function parseProgressionFrequency(
       ? frequencyCandidate
       : 1
 
-  const normalized = progressionRaw.toLowerCase()
-  const frequencyUnit: ProgressionFrequencyUnit =
-    normalized.includes('week') || normalized.includes('wk') || normalized.includes('тиж')
-      ? 'week'
-      : 'session'
-
   return {
     frequency,
-    frequencyUnit,
+    frequencyUnit: 'session',
   }
 }
 
@@ -545,6 +535,9 @@ export function extractCsvImportMetadata(csvText: string): CsvImportMetadata {
     switch (key) {
       case 'template-id':
         metadata.templateId = value
+        return
+      case 'exported-session-id':
+        metadata.exportedSessionId = value
         return
       case 'source-file-name':
         metadata.sourceFileName = value
