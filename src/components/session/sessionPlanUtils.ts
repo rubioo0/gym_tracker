@@ -90,6 +90,22 @@ function formatDualWeightValue(value: number, unit?: string): string {
   return `${formatConvertedNumber(lbsValue)} lbs (${formatConvertedNumber(kgValue)} kg)`
 }
 
+function normalizeFallbackLabelToLbs(label: string): string {
+  const convertedValues = label.replace(
+    /(-?\d+(?:[.,]\d+)?)\s*(kg|кг)\b/gi,
+    (match, numericValue: string) => {
+      const parsedValue = Number(numericValue.replace(',', '.'))
+      if (!Number.isFinite(parsedValue)) {
+        return match
+      }
+
+      return `${formatWeightNumber(parsedValue * LBS_PER_KG)} lbs`
+    },
+  )
+
+  return convertedValues.replace(/\bkg\b|\bкг\b/gi, 'lbs')
+}
+
 export function formatPlannedWeightOverview(exercise: PlannedExercise): string {
   if (exercise.isBodyweightLoad) {
     if (typeof exercise.plannedWeight === 'number') {
@@ -110,7 +126,7 @@ export function formatPlannedWeightOverview(exercise: PlannedExercise): string {
   }
 
   if (exercise.plannedLoadLabel) {
-    return exercise.plannedLoadLabel
+    return normalizeFallbackLabelToLbs(exercise.plannedLoadLabel)
   }
 
   return '-'
