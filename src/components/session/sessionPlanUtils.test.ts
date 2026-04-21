@@ -37,7 +37,7 @@ describe('sessionPlanUtils planned weight formatters', () => {
       plannedLoadLabel: 'body + 7.5 kg',
     })
 
-    expect(formatPlannedWeightDetails(exercise)).toBe('body + 7.5 kg')
+    expect(formatPlannedWeightDetails(exercise)).toBe('body + 16.5 lbs (7.5 kg)')
   })
 
   it('shows per-hand phrase for split hand loads', () => {
@@ -49,7 +49,7 @@ describe('sessionPlanUtils planned weight formatters', () => {
     })
 
     expect(formatPlannedWeightOverview(exercise)).toBe('5 kg на кожну руку')
-    expect(formatPlannedWeightDetails(exercise)).toBe('5 kg на кожну руку')
+    expect(formatPlannedWeightDetails(exercise)).toBe('11.0 lbs (5.0 kg) на кожну руку')
   })
 
   it('keeps bodyweight format even if per-side value exists accidentally', () => {
@@ -62,7 +62,18 @@ describe('sessionPlanUtils planned weight formatters', () => {
     })
 
     expect(formatPlannedWeightOverview(exercise)).toBe('1 kg')
-    expect(formatPlannedWeightDetails(exercise)).toBe('body + 1 kg')
+    expect(formatPlannedWeightDetails(exercise)).toBe('body + 2.2 lbs (1.0 kg)')
+  })
+
+  it('keeps lbs as primary and adds converted kg in details view', () => {
+    const exercise = makeExercise({
+      plannedWeight: 45,
+      weightUnit: 'lbs',
+      plannedLoadLabel: '45 lbs',
+    })
+
+    expect(formatPlannedWeightOverview(exercise)).toBe('45 lbs')
+    expect(formatPlannedWeightDetails(exercise)).toBe('45.0 lbs (20.4 kg)')
   })
 })
 

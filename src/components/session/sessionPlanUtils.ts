@@ -50,12 +50,36 @@ function formatWeightNumber(value: number): string {
   return Number(value.toFixed(2)).toString()
 }
 
+const LBS_PER_KG = 2.2046226218
+const KG_PER_LB = 0.45359237
+
+function normalizeWeightUnitForConversion(unit?: string): 'kg' | 'lbs' {
+  const normalized = unit?.toLowerCase() ?? ''
+  if (normalized.includes('lb')) {
+    return 'lbs'
+  }
+
+  return 'kg'
+}
+
+function formatConvertedNumber(value: number): string {
+  return value.toFixed(1)
+}
+
 function formatWeightValue(value: number, unit?: string): string {
   return `${formatWeightNumber(value)} ${unit ?? 'kg'}`.trim()
 }
 
 function formatPerHandValue(value: number, unit?: string): string {
   return `${formatWeightNumber(value)} ${unit ?? 'kg'} на кожну руку`
+}
+
+function formatDualWeightValue(value: number, unit?: string): string {
+  const normalizedUnit = normalizeWeightUnitForConversion(unit)
+  const lbsValue = normalizedUnit === 'lbs' ? value : value * LBS_PER_KG
+  const kgValue = normalizedUnit === 'lbs' ? value * KG_PER_LB : value
+
+  return `${formatConvertedNumber(lbsValue)} lbs (${formatConvertedNumber(kgValue)} kg)`
 }
 
 export function formatPlannedWeightOverview(exercise: PlannedExercise): string {
@@ -87,14 +111,14 @@ export function formatPlannedWeightOverview(exercise: PlannedExercise): string {
 export function formatPlannedWeightDetails(exercise: PlannedExercise): string {
   if (exercise.isBodyweightLoad) {
     if (typeof exercise.plannedWeight === 'number') {
-      return `body + ${formatWeightValue(exercise.plannedWeight, exercise.weightUnit)}`
+      return `body + ${formatDualWeightValue(exercise.plannedWeight, exercise.weightUnit)}`
     }
 
     return 'body'
   }
 
   if (typeof exercise.plannedWeightPerSide === 'number') {
-    return formatPerHandValue(exercise.plannedWeightPerSide, exercise.weightUnit)
+    return `${formatDualWeightValue(exercise.plannedWeightPerSide, exercise.weightUnit)} на кожну руку`
   }
 
   if (typeof exercise.plannedWeight !== 'number') {
@@ -105,7 +129,7 @@ export function formatPlannedWeightDetails(exercise: PlannedExercise): string {
     return '-'
   }
 
-  return formatWeightValue(exercise.plannedWeight, exercise.weightUnit)
+  return formatDualWeightValue(exercise.plannedWeight, exercise.weightUnit)
 }
 
 // Backward compatibility for any existing imports.
