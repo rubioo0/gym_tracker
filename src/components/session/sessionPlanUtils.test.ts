@@ -26,7 +26,7 @@ describe('sessionPlanUtils planned weight formatters', () => {
       plannedLoadLabel: 'body + 7.5 kg',
     })
 
-    expect(formatPlannedWeightOverview(exercise)).toBe('7.5 kg')
+    expect(formatPlannedWeightOverview(exercise)).toBe('16.53 lbs')
   })
 
   it('shows full load details for bodyweight-assisted exercises in details view', () => {
@@ -48,7 +48,7 @@ describe('sessionPlanUtils planned weight formatters', () => {
       plannedLoadLabel: '10 kg (5)',
     })
 
-    expect(formatPlannedWeightOverview(exercise)).toBe('5 kg на кожну руку')
+    expect(formatPlannedWeightOverview(exercise)).toBe('11.02 lbs на кожну руку')
     expect(formatPlannedWeightDetails(exercise)).toBe('11.0 lbs (5.0 kg) на кожну руку')
   })
 
@@ -61,7 +61,7 @@ describe('sessionPlanUtils planned weight formatters', () => {
       plannedLoadLabel: 'body + 1 kg',
     })
 
-    expect(formatPlannedWeightOverview(exercise)).toBe('1 kg')
+    expect(formatPlannedWeightOverview(exercise)).toBe('2.2 lbs')
     expect(formatPlannedWeightDetails(exercise)).toBe('body + 2.2 lbs (1.0 kg)')
   })
 
