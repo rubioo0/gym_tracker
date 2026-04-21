@@ -75,6 +75,15 @@ describe('sessionPlanUtils planned weight formatters', () => {
     expect(formatPlannedWeightOverview(exercise)).toBe('45 lbs')
     expect(formatPlannedWeightDetails(exercise)).toBe('45.0 lbs (20.4 kg)')
   })
+
+  it('converts kg fallback labels to lbs in overview only', () => {
+    const exercise = makeExercise({
+      plannedLoadLabel: 'body + 7.5 kg',
+    })
+
+    expect(formatPlannedWeightOverview(exercise)).toBe('body + 16.53 lbs')
+    expect(formatPlannedWeightDetails(exercise)).toBe('body + 7.5 kg')
+  })
 })
 
 describe('sessionPlanUtils video helpers', () => {

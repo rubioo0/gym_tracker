@@ -52,6 +52,7 @@ const statusLabel: Record<RunStatus, string> = {
 }
 
 const LBS_PER_KG = 2.2046226218
+const KG_PER_LB = 0.45359237
 
 function normalizeWeightUnit(unit?: string): 'kg' | 'lbs' {
   const normalized = unit?.toLowerCase() ?? ''
@@ -70,6 +71,18 @@ function formatWeightInLbs(value: number, unit?: string): string {
   const normalizedUnit = normalizeWeightUnit(unit)
   const lbsValue = normalizedUnit === 'lbs' ? value : value * LBS_PER_KG
   return `${Number(lbsValue.toFixed(2)).toString()} lbs`
+}
+
+function convertToDisplayedLbs(value: number, unit?: string): number {
+  const normalizedUnit = normalizeWeightUnit(unit)
+  const lbsValue = normalizedUnit === 'lbs' ? value : value * LBS_PER_KG
+  return Number(lbsValue.toFixed(2))
+}
+
+function convertFromDisplayedLbs(value: number, unit?: string): number {
+  const normalizedUnit = normalizeWeightUnit(unit)
+  const storedValue = normalizedUnit === 'lbs' ? value : value * KG_PER_LB
+  return Number(storedValue.toFixed(2))
 }
 
 function formatDateTime(iso: string): string {
@@ -213,7 +226,10 @@ function App() {
         exerciseId: exercise.id,
         completed: true,
         skipped: false,
-        actualWeight: exercise.plannedWeight,
+        actualWeight:
+          typeof exercise.plannedWeight === 'number'
+            ? convertToDisplayedLbs(exercise.plannedWeight, exercise.weightUnit)
+            : undefined,
       })),
     )
 
@@ -329,13 +345,31 @@ function App() {
       return
     }
 
+    const normalizedExerciseInputs = exerciseInputs.map((exerciseInput) => {
+      if (typeof exerciseInput.actualWeight !== 'number') {
+        return exerciseInput
+      }
+
+      const matchingExercise = plannedSession.exercises.find(
+        (exercise) => exercise.id === exerciseInput.exerciseId,
+      )
+
+      return {
+        ...exerciseInput,
+        actualWeight: convertFromDisplayedLbs(
+          exerciseInput.actualWeight,
+          matchingExercise?.weightUnit,
+        ),
+      }
+    })
+
     dispatch({
       type: 'logSession',
       payload: {
         runId: plannedSession.run.id,
         completedAt: new Date().toISOString(),
         successful: sessionSuccessful,
-        exerciseInputs,
+        exerciseInputs: normalizedExerciseInputs,
         activityInputs,
         sessionNote,
       },
@@ -1121,7 +1155,7 @@ function App() {
                         <th>Exercise</th>
                         <th>Completed</th>
                         <th>Skipped</th>
-                        <th>Actual weight</th>
+                        <th>Actual weight (lbs)</th>
                         <th>Difficulty</th>
                         <th>Note</th>
                       </tr>
@@ -1257,7 +1291,7 @@ function App() {
 
                         <div className="log-input-grid">
                           <label className="stacked-field">
-                            Actual weight
+                            Actual weight (lbs)
                             <input
                               type="number"
                               value={exerciseInput?.actualWeight ?? ''}
