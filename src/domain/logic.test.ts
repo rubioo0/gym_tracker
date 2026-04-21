@@ -137,6 +137,84 @@ describe('logic helpers', () => {
     expect(planned.exercises[0].plannedLoadLabel).toBe('body + 1 kg')
   })
 
+  it('converts latest actual weight to exercise unit before progression baseline', () => {
+    const run: FocusRun = {
+      id: 'run-1',
+      templateId: 'template-1',
+      templateName: 'Template 1',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'biceps',
+      status: 'active',
+      startedAt: '2026-04-10T10:00:00.000Z',
+      completedSessionCount: 1,
+      successfulSessionCount: 1,
+      nextSessionIndex: 0,
+    }
+
+    const template: ProgramTemplate = {
+      id: 'template-1',
+      name: 'Template 1',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'biceps',
+      sessions: [
+        {
+          id: 'session-1',
+          name: 'Session 1',
+          order: 1,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'exercise-dips',
+              name: 'Weighted Pull-up',
+              sets: '4 sets',
+              reps: '8',
+              plannedWeight: 10,
+              weightUnit: 'lbs',
+              isBodyweightLoad: true,
+              progressionRule: {
+                type: 'weight',
+                amount: 2.5,
+                frequency: 1,
+                basis: 'successfulTrackSessions',
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    const workoutLogs: WorkoutLog[] = [
+      {
+        id: 'log-1',
+        runId: 'run-1',
+        templateId: 'template-1',
+        sessionId: 'session-1',
+        sessionName: 'Session 1',
+        track: 'upper',
+        completedAt: '2026-04-10T11:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'exercise-dips',
+            exerciseName: 'Weighted Pull-up',
+            completed: true,
+            skipped: false,
+            plannedWeight: 5,
+            actualWeight: 5,
+            weightUnit: 'kg',
+          },
+        ],
+        optionalActivities: [],
+      },
+    ]
+
+    const planned = buildPlannedSession(run, template, workoutLogs)
+    expect(planned.exercises[0].plannedWeight).toBe(13.52)
+    expect(planned.exercises[0].plannedLoadLabel).toBe('body + 13.52 lbs')
+  })
+
   it('applies per-side weight progression for split hand loads', () => {
     const planned = getPlannedExercise(
       {

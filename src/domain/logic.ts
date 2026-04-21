@@ -67,6 +67,44 @@ function formatNumber(value: number): string {
   return Number(value.toFixed(2)).toString()
 }
 
+const LBS_PER_KG = 2.2046226218
+const KG_PER_LB = 0.45359237
+
+function normalizeWeightUnitForProgression(
+  unit: string | undefined,
+): 'kg' | 'lbs' | undefined {
+  if (!unit) {
+    return undefined
+  }
+
+  const normalized = unit.toLowerCase()
+  if (normalized.includes('lb')) {
+    return 'lbs'
+  }
+
+  if (normalized.includes('kg') || normalized.includes('кг')) {
+    return 'kg'
+  }
+
+  return undefined
+}
+
+function convertWeightValue(
+  value: number,
+  fromUnit: 'kg' | 'lbs',
+  toUnit: 'kg' | 'lbs',
+): number {
+  if (fromUnit === toUnit) {
+    return value
+  }
+
+  if (fromUnit === 'kg' && toUnit === 'lbs') {
+    return value * LBS_PER_KG
+  }
+
+  return value * KG_PER_LB
+}
+
 function buildPlannedLoadLabel(
   exercise: ExerciseTemplate,
   plannedWeight: number,
@@ -265,7 +303,10 @@ export function getPlannedExercise(
 function getLatestCompletedActualWeight(
   runLogs: WorkoutLog[],
   exerciseId: string,
+  targetWeightUnit: string | undefined,
 ): number | undefined {
+  const normalizedTargetWeightUnit = normalizeWeightUnitForProgression(targetWeightUnit)
+
   for (const runLog of runLogs) {
     const exerciseLog = runLog.exerciseLogs.find(
       (candidate: ExerciseLog) => candidate.exerciseId === exerciseId,
@@ -279,7 +320,21 @@ function getLatestCompletedActualWeight(
       typeof exerciseLog.actualWeight === 'number' &&
       Number.isFinite(exerciseLog.actualWeight)
     ) {
-      return exerciseLog.actualWeight
+      const normalizedLogWeightUnit = normalizeWeightUnitForProgression(
+        exerciseLog.weightUnit,
+      )
+
+      if (!normalizedTargetWeightUnit || !normalizedLogWeightUnit) {
+        return exerciseLog.actualWeight
+      }
+
+      return Number(
+        convertWeightValue(
+          exerciseLog.actualWeight,
+          normalizedLogWeightUnit,
+          normalizedTargetWeightUnit,
+        ).toFixed(2),
+      )
     }
   }
 
@@ -304,6 +359,7 @@ export function buildPlannedSession(
       const latestCompletedActualWeight = getLatestCompletedActualWeight(
         runLogs,
         exercise.id,
+        exercise.weightUnit,
       )
 
       return getPlannedExercise(
