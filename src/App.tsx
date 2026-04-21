@@ -51,6 +51,27 @@ const statusLabel: Record<RunStatus, string> = {
   archived: 'Архівовано',
 }
 
+const LBS_PER_KG = 2.2046226218
+
+function normalizeWeightUnit(unit?: string): 'kg' | 'lbs' {
+  const normalized = unit?.toLowerCase() ?? ''
+  if (normalized.includes('lb')) {
+    return 'lbs'
+  }
+
+  if (normalized.includes('kg') || normalized.includes('кг')) {
+    return 'kg'
+  }
+
+  return 'lbs'
+}
+
+function formatWeightInLbs(value: number, unit?: string): string {
+  const normalizedUnit = normalizeWeightUnit(unit)
+  const lbsValue = normalizedUnit === 'lbs' ? value : value * LBS_PER_KG
+  return `${Number(lbsValue.toFixed(2)).toString()} lbs`
+}
+
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString([], {
     year: 'numeric',
@@ -1401,7 +1422,10 @@ function App() {
                             {exerciseLog.skipped
                               ? 'skipped'
                               : exerciseLog.actualWeight !== undefined
-                                ? `${exerciseLog.actualWeight} ${exerciseLog.weightUnit ?? ''}`
+                                ? formatWeightInLbs(
+                                    exerciseLog.actualWeight,
+                                    exerciseLog.weightUnit,
+                                  )
                                 : 'done'}
                           </span>
                         </div>

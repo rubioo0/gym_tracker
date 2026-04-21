@@ -59,7 +59,11 @@ function normalizeWeightUnitForConversion(unit?: string): 'kg' | 'lbs' {
     return 'lbs'
   }
 
-  return 'kg'
+  if (normalized.includes('kg') || normalized.includes('кг')) {
+    return 'kg'
+  }
+
+  return 'lbs'
 }
 
 function formatConvertedNumber(value: number): string {
@@ -67,11 +71,15 @@ function formatConvertedNumber(value: number): string {
 }
 
 function formatWeightValue(value: number, unit?: string): string {
-  return `${formatWeightNumber(value)} ${unit ?? 'kg'}`.trim()
+  const normalizedUnit = normalizeWeightUnitForConversion(unit)
+  const lbsValue = normalizedUnit === 'lbs' ? value : value * LBS_PER_KG
+  return `${formatWeightNumber(lbsValue)} lbs`
 }
 
 function formatPerHandValue(value: number, unit?: string): string {
-  return `${formatWeightNumber(value)} ${unit ?? 'kg'} на кожну руку`
+  const normalizedUnit = normalizeWeightUnitForConversion(unit)
+  const lbsValue = normalizedUnit === 'lbs' ? value : value * LBS_PER_KG
+  return `${formatWeightNumber(lbsValue)} lbs на кожну руку`
 }
 
 function formatDualWeightValue(value: number, unit?: string): string {
