@@ -63,7 +63,7 @@ function normalizeWeightUnitForConversion(unit?: string): 'kg' | 'lbs' {
     return 'kg'
   }
 
-  return 'lbs'
+  return 'kg'
 }
 
 function formatConvertedNumber(value: number): string {
@@ -71,15 +71,11 @@ function formatConvertedNumber(value: number): string {
 }
 
 function formatWeightValue(value: number, unit?: string): string {
-  const normalizedUnit = normalizeWeightUnitForConversion(unit)
-  const lbsValue = normalizedUnit === 'lbs' ? value : value * LBS_PER_KG
-  return `${formatWeightNumber(lbsValue)} lbs`
+  return `${formatWeightNumber(value)} ${unit ?? 'kg'}`.trim()
 }
 
 function formatPerHandValue(value: number, unit?: string): string {
-  const normalizedUnit = normalizeWeightUnitForConversion(unit)
-  const lbsValue = normalizedUnit === 'lbs' ? value : value * LBS_PER_KG
-  return `${formatWeightNumber(lbsValue)} lbs на кожну руку`
+  return `${formatWeightNumber(value)} ${unit ?? 'kg'} на кожну руку`
 }
 
 function formatDualWeightValue(value: number, unit?: string): string {
@@ -88,22 +84,6 @@ function formatDualWeightValue(value: number, unit?: string): string {
   const kgValue = normalizedUnit === 'lbs' ? value * KG_PER_LB : value
 
   return `${formatConvertedNumber(lbsValue)} lbs (${formatConvertedNumber(kgValue)} kg)`
-}
-
-function normalizeFallbackLabelToLbs(label: string): string {
-  const convertedValues = label.replace(
-    /(-?\d+(?:[.,]\d+)?)\s*(kg|кг)\b/gi,
-    (match, numericValue: string) => {
-      const parsedValue = Number(numericValue.replace(',', '.'))
-      if (!Number.isFinite(parsedValue)) {
-        return match
-      }
-
-      return `${formatWeightNumber(parsedValue * LBS_PER_KG)} lbs`
-    },
-  )
-
-  return convertedValues.replace(/\bkg\b|\bкг\b/gi, 'lbs')
 }
 
 export function formatPlannedWeightOverview(exercise: PlannedExercise): string {
@@ -126,7 +106,7 @@ export function formatPlannedWeightOverview(exercise: PlannedExercise): string {
   }
 
   if (exercise.plannedLoadLabel) {
-    return normalizeFallbackLabelToLbs(exercise.plannedLoadLabel)
+    return exercise.plannedLoadLabel
   }
 
   return '-'

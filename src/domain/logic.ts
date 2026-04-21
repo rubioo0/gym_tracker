@@ -304,6 +304,7 @@ function getLatestCompletedActualWeight(
   runLogs: WorkoutLog[],
   exerciseId: string,
   targetWeightUnit: string | undefined,
+  minimumBaselineWeight: number | undefined,
 ): number | undefined {
   const normalizedTargetWeightUnit = normalizeWeightUnitForProgression(targetWeightUnit)
 
@@ -328,13 +329,23 @@ function getLatestCompletedActualWeight(
         return exerciseLog.actualWeight
       }
 
-      return Number(
+      const convertedWeight = Number(
         convertWeightValue(
           exerciseLog.actualWeight,
           normalizedLogWeightUnit,
           normalizedTargetWeightUnit,
         ).toFixed(2),
       )
+
+      if (
+        normalizedLogWeightUnit !== normalizedTargetWeightUnit &&
+        typeof minimumBaselineWeight === 'number' &&
+        Number.isFinite(minimumBaselineWeight)
+      ) {
+        return Number(Math.max(convertedWeight, minimumBaselineWeight).toFixed(2))
+      }
+
+      return convertedWeight
     }
   }
 
@@ -360,6 +371,7 @@ export function buildPlannedSession(
         runLogs,
         exercise.id,
         exercise.weightUnit,
+        exercise.plannedWeight,
       )
 
       return getPlannedExercise(

@@ -215,6 +215,86 @@ describe('logic helpers', () => {
     expect(planned.exercises[0].plannedLoadLabel).toBe('body + 13.52 lbs')
   })
 
+  it('does not let converted cross-unit baseline drop below configured planned weight', () => {
+    const run: FocusRun = {
+      id: 'run-1',
+      templateId: 'template-1',
+      templateName: 'Template 1',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'biceps',
+      status: 'active',
+      startedAt: '2026-04-10T10:00:00.000Z',
+      completedSessionCount: 1,
+      successfulSessionCount: 1,
+      nextSessionIndex: 0,
+    }
+
+    const template: ProgramTemplate = {
+      id: 'template-1',
+      name: 'Template 1',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'biceps',
+      sessions: [
+        {
+          id: 'session-1',
+          name: 'Session 1',
+          order: 1,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'exercise-dips',
+              name: 'Vertical Bench Press',
+              sets: '4 sets',
+              reps: '8',
+              plannedWeight: 15,
+              plannedWeightPerSide: 7.5,
+              weightUnit: 'lbs',
+              progressionRule: {
+                type: 'weight',
+                amount: 5,
+                amountPerSide: 2.5,
+                frequency: 1,
+                basis: 'successfulTrackSessions',
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    const workoutLogs: WorkoutLog[] = [
+      {
+        id: 'log-1',
+        runId: 'run-1',
+        templateId: 'template-1',
+        sessionId: 'session-1',
+        sessionName: 'Session 1',
+        track: 'upper',
+        completedAt: '2026-04-10T11:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'exercise-dips',
+            exerciseName: 'Vertical Bench Press',
+            completed: true,
+            skipped: false,
+            plannedWeight: 7,
+            actualWeight: 3.9,
+            weightUnit: 'kg',
+          },
+        ],
+        optionalActivities: [],
+      },
+    ]
+
+    const planned = buildPlannedSession(run, template, workoutLogs)
+    expect(planned.exercises[0].plannedWeight).toBe(20)
+    expect(planned.exercises[0].plannedWeightPerSide).toBe(10)
+    expect(planned.exercises[0].plannedLoadLabel).toBe('20 lbs (10)')
+  })
+
   it('applies per-side weight progression for split hand loads', () => {
     const planned = getPlannedExercise(
       {
