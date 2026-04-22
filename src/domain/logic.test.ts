@@ -132,9 +132,9 @@ describe('logic helpers', () => {
     ]
 
     const planned = buildPlannedSession(run, template, workoutLogs)
-    expect(planned.exercises[0].plannedWeight).toBe(1)
+    expect(planned.exercises[0].plannedWeight).toBe(0)
     expect(planned.exercises[0].plannedWeightPerSide).toBeUndefined()
-    expect(planned.exercises[0].plannedLoadLabel).toBe('body + 1 kg')
+    expect(planned.exercises[0].plannedLoadLabel).toBe('body + 0 kg')
   })
 
   it('ignores latest actual weight when it uses a different unit', () => {
@@ -321,10 +321,40 @@ describe('logic helpers', () => {
       },
     )
 
-    expect(planned.plannedWeight).toBe(20)
-    expect(planned.plannedWeightPerSide).toBe(10)
-    expect(planned.plannedLoadLabel).toBe('20 kg (10)')
+    expect(planned.plannedWeight).toBe(15)
+    expect(planned.plannedWeightPerSide).toBe(7.5)
+    expect(planned.plannedLoadLabel).toBe('15 kg (7.5)')
     expect(planned.nextTargetHint).toContain('week')
+  })
+
+  it('computes fixed-program max target from current baseline', () => {
+    const planned = getPlannedExercise(
+      {
+        id: 'e1',
+        name: 'Curl',
+        sets: '4',
+        reps: '10',
+        plannedWeight: 60,
+        weightUnit: 'lbs',
+        progressionRule: {
+          type: 'weight',
+          amount: 5,
+          frequency: 2,
+          frequencyUnit: 'week',
+          basis: 'successfulTrackSessions',
+        },
+      },
+      {
+        completedSessionCount: 2,
+        successfulSessionCount: 2,
+      },
+      {
+        latestCompletedActualWeight: 40,
+      },
+    )
+
+    expect(planned.maxPlannedWeight).toBe(60)
+    expect(planned.maxWeightExplanation).toContain('8 weeks (16 sessions)')
   })
 
   it('applies reps progression for numeric ranges', () => {

@@ -87,6 +87,14 @@ function formatPerHandValue(value: number, unit?: string): string {
   return `${formatOverviewWeightNumber(value, unit)} ${unit ?? 'kg'} на кожну руку`
 }
 
+function formatPerHandWithTotal(
+  perHandValue: number,
+  totalValue: number,
+  unit?: string,
+): string {
+  return `${formatPerHandValue(perHandValue, unit)} (${formatWeightValue(totalValue, unit)} total)`
+}
+
 function formatDualWeightValue(value: number, unit?: string): string {
   const normalizedUnit = normalizeWeightUnitForConversion(unit)
   const lbsValue = normalizedUnit === 'lbs' ? value : value * LBS_PER_KG
@@ -106,7 +114,15 @@ export function formatPlannedWeightOverview(exercise: PlannedExercise): string {
   }
 
   if (typeof exercise.plannedWeightPerSide === 'number') {
-    return formatPerHandValue(exercise.plannedWeightPerSide, exercise.weightUnit)
+    const totalWeight =
+      typeof exercise.plannedWeight === 'number'
+        ? exercise.plannedWeight
+        : exercise.plannedWeightPerSide * 2
+    return formatPerHandWithTotal(
+      exercise.plannedWeightPerSide,
+      totalWeight,
+      exercise.weightUnit,
+    )
   }
 
   if (typeof exercise.plannedWeight === 'number') {
@@ -116,6 +132,26 @@ export function formatPlannedWeightOverview(exercise: PlannedExercise): string {
 
   if (exercise.plannedLoadLabel) {
     return exercise.plannedLoadLabel
+  }
+
+  return '-'
+}
+
+export function formatPlannedMaxWeightOverview(exercise: PlannedExercise): string {
+  if (typeof exercise.maxPlannedWeightPerSide === 'number') {
+    const totalWeight =
+      typeof exercise.maxPlannedWeight === 'number'
+        ? exercise.maxPlannedWeight
+        : exercise.maxPlannedWeightPerSide * 2
+    return formatPerHandWithTotal(
+      exercise.maxPlannedWeightPerSide,
+      totalWeight,
+      exercise.weightUnit,
+    )
+  }
+
+  if (typeof exercise.maxPlannedWeight === 'number') {
+    return formatWeightValue(exercise.maxPlannedWeight, exercise.weightUnit)
   }
 
   return '-'

@@ -21,6 +21,10 @@ interface PlannedExerciseOptions {
   latestCompletedActualWeight?: number
 }
 
+const FIXED_PROGRAM_WEEKS = 8
+const FIXED_PROGRAM_SESSIONS = 16
+const SESSIONS_PER_WEEK = FIXED_PROGRAM_SESSIONS / FIXED_PROGRAM_WEEKS
+
 export function makeId(): string {
   return crypto.randomUUID()
 }
@@ -50,6 +54,42 @@ export function getProgressionSteps(
     return 0
   }
   return Math.floor(completedSessionCount / frequency)
+}
+
+function getEffectiveFrequencySessions(rule: ProgressionRule): number {
+  if (rule.frequency <= 0) {
+    return 0
+  }
+
+  if (rule.frequencyUnit === 'week') {
+    return Math.max(1, Math.round(rule.frequency * SESSIONS_PER_WEEK))
+  }
+
+  return rule.frequency
+}
+
+function getNextHintCount(
+  rule: ProgressionRule,
+  sessionsUntilNext: number,
+): number {
+  if (rule.frequencyUnit === 'week') {
+    return Math.max(1, Math.ceil(sessionsUntilNext / SESSIONS_PER_WEEK))
+  }
+
+  return sessionsUntilNext
+}
+
+function getFixedProgramProgressionStepCount(rule: ProgressionRule): number {
+  if (rule.frequency <= 0) {
+    return 0
+  }
+
+  if (rule.frequencyUnit === 'week') {
+    // Week-based progression starts from week 2 and advances by frequency weeks.
+    return Math.max(0, Math.ceil((FIXED_PROGRAM_WEEKS - 1) / rule.frequency))
+  }
+
+  return Math.max(0, Math.ceil((FIXED_PROGRAM_SESSIONS - 1) / rule.frequency))
 }
 
 function clamp(value: number, minValue?: number, maxValue?: number): number {
@@ -164,6 +204,19 @@ function getFrequencyUnitLabel(rule: ProgressionRule, count: number): string {
   return count === 1 ? base : `${base}s`
 }
 
+function buildMaxWeightExplanation(
+  baseWeight: number,
+  unit: string,
+  amount: number,
+  frequency: number,
+  frequencyUnit: 'week' | 'session',
+  steps: number,
+  maxWeight: number,
+): string {
+  const frequencyLabel = frequency === 1 ? frequencyUnit : `${frequencyUnit}s`
+  return `${formatNumber(baseWeight)} ${unit} + (${steps} x ${formatNumber(amount)} ${unit}) every ${frequency} ${frequencyLabel} across ${FIXED_PROGRAM_WEEKS} weeks (${FIXED_PROGRAM_SESSIONS} sessions) = ${formatNumber(maxWeight)} ${unit}`
+}
+
 function shouldUsePerSideLoadSchema(exercise: ExerciseTemplate): boolean {
   if (exercise.isBodyweightLoad) {
     return false
@@ -198,16 +251,17 @@ export function getPlannedExercise(
   const rule = exercise.progressionRule
   const counters = normalizeProgressionCounters(countersOrCompleted)
   const progressionSessionCount = getProgressionSessionCount(rule, counters)
-  const steps = getProgressionSteps(progressionSessionCount, rule.frequency)
+  const effectiveFrequencySessions = getEffectiveFrequencySessions(rule)
+  const steps = getProgressionSteps(progressionSessionCount, effectiveFrequencySessions)
   const hasLatestCompletedActualWeight =
     typeof options?.latestCompletedActualWeight === 'number' &&
     Number.isFinite(options.latestCompletedActualWeight)
 
   const shouldAdvanceFromLatestCompletedActual =
     hasLatestCompletedActualWeight &&
-    rule.frequency > 0 &&
+    effectiveFrequencySessions > 0 &&
     progressionSessionCount > 0 &&
-    progressionSessionCount % rule.frequency === 0
+    progressionSessionCount % effectiveFrequencySessions === 0
 
   const effectiveWeightSteps = hasLatestCompletedActualWeight
     ? shouldAdvanceFromLatestCompletedActual
@@ -258,9 +312,45 @@ export function getPlannedExercise(
       planned.plannedWeight,
       progressedPerSide,
     )
+    const maxSteps = getFixedProgramProgressionStepCount(rule)
+    const unitLabel = exercise.weightUnit ?? 'kg'
+    const maxProgressedWeight = clamp(
+      basePlannedWeight + maxSteps * rule.amount,
+      rule.minValue,
+      rule.maxValue,
+    )
+
+    planned.maxPlannedWeight = Number(maxProgressedWeight.toFixed(2))
+    if (typeof basePlannedWeightPerSide === 'number') {
+      if (typeof rule.amountPerSide === 'number') {
+        planned.maxPlannedWeightPerSide = Number(
+          (basePlannedWeightPerSide + maxSteps * rule.amountPerSide).toFixed(2),
+        )
+      } else {
+        planned.maxPlannedWeightPerSide = Number((maxProgressedWeight / 2).toFixed(2))
+      }
+    }
+
+    planned.maxWeightExplanation = buildMaxWeightExplanation(
+      basePlannedWeight,
+      unitLabel,
+      rule.amount,
+      rule.frequency,
+      rule.frequencyUnit === 'week' ? 'week' : 'session',
+      maxSteps,
+      maxProgressedWeight,
+    )
+
     planned.nextTargetHint =
-      rule.frequency > 0
-        ? `Next increase in ${getSessionsUntilNext(progressionSessionCount, rule.frequency)} ${getFrequencyUnitLabel(rule, getSessionsUntilNext(progressionSessionCount, rule.frequency))}`
+      effectiveFrequencySessions > 0
+        ? (() => {
+            const sessionsUntilNext = getSessionsUntilNext(
+              progressionSessionCount,
+              effectiveFrequencySessions,
+            )
+            const hintCount = getNextHintCount(rule, sessionsUntilNext)
+            return `Next increase in ${hintCount} ${getFrequencyUnitLabel(rule, hintCount)}`
+          })()
         : undefined
     return planned
   }
@@ -272,8 +362,15 @@ export function getPlannedExercise(
       const end = parsed.end + steps * rule.amount
       planned.reps = start === end ? `${start}` : `${start}-${end}`
       planned.nextTargetHint =
-        rule.frequency > 0
-          ? `Next increase in ${getSessionsUntilNext(progressionSessionCount, rule.frequency)} ${getFrequencyUnitLabel(rule, getSessionsUntilNext(progressionSessionCount, rule.frequency))}`
+        effectiveFrequencySessions > 0
+          ? (() => {
+              const sessionsUntilNext = getSessionsUntilNext(
+                progressionSessionCount,
+                effectiveFrequencySessions,
+              )
+              const hintCount = getNextHintCount(rule, sessionsUntilNext)
+              return `Next increase in ${hintCount} ${getFrequencyUnitLabel(rule, hintCount)}`
+            })()
           : undefined
     }
   }

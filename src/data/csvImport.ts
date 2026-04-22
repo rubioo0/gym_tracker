@@ -31,10 +31,9 @@ export interface CsvImportMetadata {
 
 const DEFAULT_MODE: ProgramMode = 'main'
 const DEFAULT_TRACK: TrackType = 'upper'
-const DEFAULT_DURATION_WEEKS = 8
-const BASELINE_DURATION_WEEKS = 8
-const BASELINE_SESSION_COUNT = 12
-const SESSIONS_PER_WEEK = BASELINE_SESSION_COUNT / BASELINE_DURATION_WEEKS
+const FIXED_PROGRAM_DURATION_WEEKS = 8
+const FIXED_PROGRAM_SESSION_COUNT = 16
+const SESSIONS_PER_WEEK = FIXED_PROGRAM_SESSION_COUNT / FIXED_PROGRAM_DURATION_WEEKS
 export const CSV_METADATA_ROW_PREFIX = 'training-os-metadata'
 
 interface ParsedLoadConfig {
@@ -84,14 +83,15 @@ function formatNumber(value: number): string {
 }
 
 function normalizeDurationWeeks(durationWeeks: number | undefined): number {
-  if (!Number.isFinite(durationWeeks)) {
-    return DEFAULT_DURATION_WEEKS
-  }
-
-  return Math.max(1, Math.round(durationWeeks as number))
+  void durationWeeks
+  return FIXED_PROGRAM_DURATION_WEEKS
 }
 
 function estimateProgramSessionCount(durationWeeks: number): number {
+  if (durationWeeks === FIXED_PROGRAM_DURATION_WEEKS) {
+    return FIXED_PROGRAM_SESSION_COUNT
+  }
+
   return Math.max(1, Math.round(durationWeeks * SESSIONS_PER_WEEK))
 }
 
@@ -339,11 +339,15 @@ function parseProgressionFrequency(
   const pipeMatch = progressionRaw.match(/\|\s*(\d+)\s*([a-zA-Zа-яА-ЯіІїЇєЄґҐ]*)/)
   if (pipeMatch) {
     const parsedFrequency = Number(pipeMatch[1])
+    const unitToken = (pipeMatch[2] ?? '').toLowerCase()
 
     if (Number.isInteger(parsedFrequency) && parsedFrequency > 0) {
       return {
         frequency: parsedFrequency,
-        frequencyUnit: 'session',
+        frequencyUnit:
+          unitToken.includes('week') || unitToken.includes('тиж')
+            ? 'week'
+            : 'session',
       }
     }
   }
@@ -360,7 +364,11 @@ function parseProgressionFrequency(
 
   return {
     frequency,
-    frequencyUnit: 'session',
+    frequencyUnit:
+      progressionRaw.toLowerCase().includes('week') ||
+      progressionRaw.toLowerCase().includes('тиж')
+        ? 'week'
+        : 'session',
   }
 }
 
@@ -413,10 +421,10 @@ function estimateProgressionSteps(
   }
 
   if (frequencyUnit === 'week') {
-    return Math.floor(durationWeeks / frequency)
+    return Math.max(0, Math.ceil((durationWeeks - 1) / frequency))
   }
 
-  return Math.floor(durationSessionCount / frequency)
+  return Math.max(0, Math.ceil((durationSessionCount - 1) / frequency))
 }
 
 function pickReferenceCell(row: string[]): string {
