@@ -126,9 +126,9 @@ describe('app reducer', () => {
     }
 
     const nextPlanned = buildPlannedSession(nextRun, template, logged.workoutLogs)
-    expect(nextPlanned.exercises[0].plannedWeight).toBe(0)
+    expect(nextPlanned.exercises[0].plannedWeight).toBe(1)
     expect(nextPlanned.exercises[0].plannedWeightPerSide).toBeUndefined()
-    expect(nextPlanned.exercises[0].plannedLoadLabel).toBe('body + 0 kg')
+    expect(nextPlanned.exercises[0].plannedLoadLabel).toBe('body + 1 kg')
   })
 
   it('supports logging without counting progression success', () => {

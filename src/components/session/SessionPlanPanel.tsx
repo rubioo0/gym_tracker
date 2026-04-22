@@ -24,8 +24,10 @@ export function SessionPlanPanel({
 }: SessionPlanPanelProps) {
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null)
   const [detailsExerciseId, setDetailsExerciseId] = useState<string | null>(null)
-  const lastTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const lastTriggerRef = useRef<HTMLElement | null>(null)
   const exercises = plannedSession?.exercises ?? []
+  const sessionsDone = plannedSession?.run.completedSessionCount ?? 0
+  const sessionsLeft = Math.max(0, 16 - sessionsDone)
 
   function hasExerciseId(exerciseId: string | null): exerciseId is string {
     return Boolean(
@@ -77,7 +79,7 @@ export function SessionPlanPanel({
     return index >= 0 ? index + 1 : null
   }, [detailsExercise, plannedSession])
 
-  function handleOpenExercise(exerciseId: string, trigger: HTMLButtonElement): void {
+  function handleOpenExercise(exerciseId: string, trigger: HTMLElement): void {
     lastTriggerRef.current = trigger
     setSelectedExerciseId(exerciseId)
     setDetailsExerciseId(exerciseId)
@@ -139,6 +141,8 @@ export function SessionPlanPanel({
           <SessionExerciseCardList
             exercises={plannedSession.exercises}
             selectedExerciseId={effectiveSelectedExerciseId}
+            sessionsDone={sessionsDone}
+            sessionsLeft={sessionsLeft}
             onOpenExercise={handleOpenExercise}
           />
 

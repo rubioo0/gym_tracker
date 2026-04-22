@@ -239,6 +239,7 @@ button:disabled:hover {
 .exercise-card {
   width: 100%;
   text-align: left;
+  cursor: pointer;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: linear-gradient(170deg, var(--card), var(--surface-a));

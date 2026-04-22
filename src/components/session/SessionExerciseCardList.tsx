@@ -10,15 +10,19 @@ import {
 interface SessionExerciseCardListProps {
   exercises: PlannedExercise[]
   selectedExerciseId: string | null
+  sessionsDone: number
+  sessionsLeft: number
   onOpenExercise: (
     exerciseId: string,
-    trigger: HTMLButtonElement,
+    trigger: HTMLElement,
   ) => void
 }
 
 export function SessionExerciseCardList({
   exercises,
   selectedExerciseId,
+  sessionsDone,
+  sessionsLeft,
   onOpenExercise,
 }: SessionExerciseCardListProps) {
   const [infoExerciseId, setInfoExerciseId] = useState<string | null>(null)
@@ -33,8 +37,9 @@ export function SessionExerciseCardList({
 
         return (
           <li key={exercise.id} className="exercise-card-item">
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
               className={[
                 'exercise-card',
                 `exercise-card-${category}`,
@@ -42,6 +47,12 @@ export function SessionExerciseCardList({
               ].join(' ')}
               aria-pressed={isActive}
               onClick={(event) => onOpenExercise(exercise.id, event.currentTarget)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  onOpenExercise(exercise.id, event.currentTarget)
+                }
+              }}
             >
               <div className="exercise-card-header">
                 <span className="exercise-card-order">#{index + 1}</span>
@@ -67,33 +78,42 @@ export function SessionExerciseCardList({
                   <strong>Max</strong>
                   {formatPlannedMaxWeightOverview(exercise)}
                 </span>
+                <span className="exercise-chip">
+                  <strong>Done</strong>
+                  {sessionsDone}
+                </span>
+                <span className="exercise-chip">
+                  <strong>Left</strong>
+                  {sessionsLeft}
+                </span>
               </div>
-            </button>
 
-            {exercise.maxWeightExplanation ? (
-              <div className="exercise-card-info-wrap">
-                <button
-                  type="button"
-                  className="exercise-card-info-button"
-                  aria-expanded={isInfoOpen}
-                  aria-controls={`exercise-info-${exercise.id}`}
-                  onClick={() => {
-                    setInfoExerciseId((current) =>
-                      current === exercise.id ? null : exercise.id,
-                    )
-                  }}
-                >
-                  i
-                </button>
-                <span className="exercise-card-info-label">How max is calculated</span>
-              </div>
-            ) : null}
+              {exercise.maxWeightExplanation ? (
+                <div className="exercise-card-info-wrap">
+                  <button
+                    type="button"
+                    className="exercise-card-info-button"
+                    aria-expanded={isInfoOpen}
+                    aria-controls={`exercise-info-${exercise.id}`}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setInfoExerciseId((current) =>
+                        current === exercise.id ? null : exercise.id,
+                      )
+                    }}
+                  >
+                    i
+                  </button>
+                  <span className="exercise-card-info-label">How max is calculated</span>
+                </div>
+              ) : null}
 
-            {isInfoOpen && exercise.maxWeightExplanation ? (
-              <p id={`exercise-info-${exercise.id}`} className="exercise-card-info-panel">
-                {exercise.maxWeightExplanation}
-              </p>
-            ) : null}
+              {isInfoOpen && exercise.maxWeightExplanation ? (
+                <p id={`exercise-info-${exercise.id}`} className="exercise-card-info-panel">
+                  {exercise.maxWeightExplanation}
+                </p>
+              ) : null}
+            </div>
           </li>
         )
       })}
