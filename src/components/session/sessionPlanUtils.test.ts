@@ -49,8 +49,10 @@ describe('sessionPlanUtils planned weight formatters', () => {
       plannedLoadLabel: '10 kg (5)',
     })
 
-    expect(formatPlannedWeightOverview(exercise)).toBe('5 kg на кожну руку (10 kg total)')
-    expect(formatPlannedWeightDetails(exercise)).toBe('11.0 lbs (5.0 kg) на кожну руку')
+    expect(formatPlannedWeightOverview(exercise)).toBe('5 kg на кожну руку')
+    expect(formatPlannedWeightDetails(exercise)).toBe(
+      '11.0 lbs (5.0 kg) на кожну руку (total: 22.0 lbs (10.0 kg))',
+    )
   })
 
   it('keeps bodyweight format even if per-side value exists accidentally', () => {
@@ -85,10 +87,10 @@ describe('sessionPlanUtils planned weight formatters', () => {
       plannedLoadLabel: '44.1 lbs (22.05)',
     })
 
-    expect(formatPlannedWeightOverview(exercise)).toBe(
-      '22.1 lbs на кожну руку (44.1 lbs total)',
+    expect(formatPlannedWeightOverview(exercise)).toBe('22.1 lbs на кожну руку')
+    expect(formatPlannedWeightDetails(exercise)).toBe(
+      '22.1 lbs (10.0 kg) на кожну руку (total: 44.1 lbs (20.0 kg))',
     )
-    expect(formatPlannedWeightDetails(exercise)).toBe('22.1 lbs (10.0 kg) на кожну руку')
   })
 
   it('formats max overview from max planned fields', () => {

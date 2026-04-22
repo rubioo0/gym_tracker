@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { PlannedExercise } from '../../domain/types'
 import {
+  formatPlannedMaxWeightOverview,
   formatPlannedWeightDetails,
   getEmbeddableVideoUrl,
   isDirectPlayableVideoUrl,
@@ -20,6 +21,7 @@ export function SessionExerciseDetailsModal({
   const titleId = useId()
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const [brokenVideoSource, setBrokenVideoSource] = useState<string | null>(null)
+  const [showMaxExplanation, setShowMaxExplanation] = useState(false)
 
   const imageUrl = exercise?.reference?.imageUrl
   const videoUrl = exercise?.reference?.videoUrl
@@ -140,7 +142,37 @@ export function SessionExerciseDetailsModal({
                 <span>Progression</span>
                 <strong>{exercise.progressionNote ?? '-'}</strong>
               </div>
+              <div className="exercise-detail-item">
+                <span>Max</span>
+                <strong>{formatPlannedMaxWeightOverview(exercise)}</strong>
+              </div>
+              <div className="exercise-detail-item">
+                <span>Done</span>
+                <strong>{exercise.sessionDoneCount ?? 0}</strong>
+              </div>
+              <div className="exercise-detail-item">
+                <span>Left</span>
+                <strong>{exercise.sessionLeftCount ?? 16}</strong>
+              </div>
             </div>
+
+            {exercise.maxWeightExplanation ? (
+              <div className="exercise-card-info-wrap">
+                <button
+                  type="button"
+                  className="exercise-card-info-button"
+                  aria-expanded={showMaxExplanation}
+                  onClick={() => setShowMaxExplanation((current) => !current)}
+                >
+                  i
+                </button>
+                <span className="exercise-card-info-label">How max is calculated</span>
+              </div>
+            ) : null}
+
+            {showMaxExplanation && exercise.maxWeightExplanation ? (
+              <p className="exercise-card-info-panel">{exercise.maxWeightExplanation}</p>
+            ) : null}
 
             {exercise.nextTargetHint ? (
               <p className="note">{exercise.nextTargetHint}</p>

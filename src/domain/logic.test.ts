@@ -389,6 +389,107 @@ describe('logic helpers', () => {
     expect(planned.maxWeightExplanation).toContain('sessions done 2, sessions left 14')
   })
 
+  it('uses history by exercise name when IDs changed', () => {
+    const run: FocusRun = {
+      id: 'run-1',
+      templateId: 'template-1',
+      templateName: 'Template 1',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'arms',
+      status: 'active',
+      startedAt: '2026-04-10T10:00:00.000Z',
+      completedSessionCount: 1,
+      successfulSessionCount: 1,
+      nextSessionIndex: 0,
+    }
+
+    const template: ProgramTemplate = {
+      id: 'template-1',
+      name: 'Template 1',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'arms',
+      sessions: [
+        {
+          id: 'session-1',
+          name: 'Session 1',
+          order: 1,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'new-dips-id',
+              name: 'Бруси',
+              sets: '4 sets',
+              reps: '10',
+              plannedWeight: 12.5,
+              weightUnit: 'lbs',
+              isBodyweightLoad: true,
+              progressionRule: {
+                type: 'weight',
+                amount: 2.5,
+                frequency: 1,
+                frequencyUnit: 'week',
+                basis: 'successfulTrackSessions',
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    const workoutLogs: WorkoutLog[] = [
+      {
+        id: 'log-2',
+        runId: 'run-1',
+        templateId: 'template-1',
+        sessionId: 'session-1',
+        sessionName: 'Session 1',
+        track: 'upper',
+        completedAt: '2026-04-12T11:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'old-dips-id',
+            exerciseName: 'Бруси',
+            completed: true,
+            skipped: false,
+            plannedWeight: 12.5,
+            actualWeight: 12.5,
+            weightUnit: 'lbs',
+          },
+        ],
+        optionalActivities: [],
+      },
+      {
+        id: 'log-1',
+        runId: 'run-1',
+        templateId: 'template-1',
+        sessionId: 'session-1',
+        sessionName: 'Session 1',
+        track: 'upper',
+        completedAt: '2026-04-10T11:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'old-dips-id',
+            exerciseName: 'Бруси',
+            completed: true,
+            skipped: false,
+            plannedWeight: 12.5,
+            actualWeight: 12.5,
+            weightUnit: 'lbs',
+          },
+        ],
+        optionalActivities: [],
+      },
+    ]
+
+    const plannedSession = buildPlannedSession(run, template, workoutLogs)
+    expect(plannedSession.exercises[0].sessionDoneCount).toBe(2)
+    expect(plannedSession.exercises[0].sessionLeftCount).toBe(14)
+  })
+
   it('applies reps progression for numeric ranges', () => {
     const planned = getPlannedExercise(
       {

@@ -138,6 +138,30 @@ function normalizeWeightUnitForProgression(
   return undefined
 }
 
+function normalizeExerciseNameForMatching(value: string | undefined): string {
+  if (!value) {
+    return ''
+  }
+
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[^a-z0-9а-яіїєґ]/gi, '')
+}
+
+function isSameExercise(
+  exercise: ExerciseTemplate,
+  candidate: ExerciseLog,
+): boolean {
+  if (candidate.exerciseId === exercise.id) {
+    return true
+  }
+
+  const targetName = normalizeExerciseNameForMatching(exercise.name)
+  const candidateName = normalizeExerciseNameForMatching(candidate.exerciseName)
+  return targetName.length > 0 && targetName === candidateName
+}
+
 function buildPlannedLoadLabel(
   exercise: ExerciseTemplate,
   plannedWeight: number,
@@ -399,14 +423,14 @@ export function getPlannedExercise(
 
 function getLatestCompletedActualWeight(
   runLogs: WorkoutLog[],
-  exerciseId: string,
+  exercise: ExerciseTemplate,
   targetWeightUnit: string | undefined,
 ): number | undefined {
   const normalizedTargetWeightUnit = normalizeWeightUnitForProgression(targetWeightUnit)
 
   for (const runLog of runLogs) {
     const exerciseLog = runLog.exerciseLogs.find(
-      (candidate: ExerciseLog) => candidate.exerciseId === exerciseId,
+      (candidate: ExerciseLog) => isSameExercise(exercise, candidate),
     )
 
     if (!exerciseLog || !exerciseLog.completed || exerciseLog.skipped) {
@@ -437,6 +461,34 @@ function getLatestCompletedActualWeight(
   return undefined
 }
 
+function getExerciseProgressionCounters(
+  runLogs: WorkoutLog[],
+  exercise: ExerciseTemplate,
+): ProgressionCounters {
+  let completedSessionCount = 0
+  let successfulSessionCount = 0
+
+  for (const runLog of runLogs) {
+    const exerciseLog = runLog.exerciseLogs.find((candidate) =>
+      isSameExercise(exercise, candidate),
+    )
+
+    if (!exerciseLog || !exerciseLog.completed || exerciseLog.skipped) {
+      continue
+    }
+
+    completedSessionCount += 1
+    if (runLog.successful) {
+      successfulSessionCount += 1
+    }
+  }
+
+  return {
+    completedSessionCount,
+    successfulSessionCount,
+  }
+}
+
 export function buildPlannedSession(
   run: FocusRun,
   template: ProgramTemplate,
@@ -452,22 +504,28 @@ export function buildPlannedSession(
     template,
     session,
     exercises: session.exercises.map((exercise) => {
+      const exerciseCounters = getExerciseProgressionCounters(runLogs, exercise)
       const latestCompletedActualWeight = getLatestCompletedActualWeight(
         runLogs,
-        exercise.id,
+        exercise,
         exercise.weightUnit,
       )
 
-      return getPlannedExercise(
+      const plannedExercise = getPlannedExercise(
         exercise,
-        {
-          completedSessionCount: run.completedSessionCount,
-          successfulSessionCount: run.successfulSessionCount,
-        },
+        exerciseCounters,
         {
           latestCompletedActualWeight,
         },
       )
+
+      plannedExercise.sessionDoneCount = exerciseCounters.completedSessionCount
+      plannedExercise.sessionLeftCount = Math.max(
+        0,
+        FIXED_PROGRAM_SESSIONS - exerciseCounters.completedSessionCount,
+      )
+
+      return plannedExercise
     }),
   }
 }

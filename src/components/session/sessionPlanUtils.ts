@@ -87,14 +87,6 @@ function formatPerHandValue(value: number, unit?: string): string {
   return `${formatOverviewWeightNumber(value, unit)} ${unit ?? 'kg'} на кожну руку`
 }
 
-function formatPerHandWithTotal(
-  perHandValue: number,
-  totalValue: number,
-  unit?: string,
-): string {
-  return `${formatPerHandValue(perHandValue, unit)} (${formatWeightValue(totalValue, unit)} total)`
-}
-
 function formatDualWeightValue(value: number, unit?: string): string {
   const normalizedUnit = normalizeWeightUnitForConversion(unit)
   const lbsValue = normalizedUnit === 'lbs' ? value : value * LBS_PER_KG
@@ -114,15 +106,7 @@ export function formatPlannedWeightOverview(exercise: PlannedExercise): string {
   }
 
   if (typeof exercise.plannedWeightPerSide === 'number') {
-    const totalWeight =
-      typeof exercise.plannedWeight === 'number'
-        ? exercise.plannedWeight
-        : exercise.plannedWeightPerSide * 2
-    return formatPerHandWithTotal(
-      exercise.plannedWeightPerSide,
-      totalWeight,
-      exercise.weightUnit,
-    )
+    return formatPerHandValue(exercise.plannedWeightPerSide, exercise.weightUnit)
   }
 
   if (typeof exercise.plannedWeight === 'number') {
@@ -139,15 +123,7 @@ export function formatPlannedWeightOverview(exercise: PlannedExercise): string {
 
 export function formatPlannedMaxWeightOverview(exercise: PlannedExercise): string {
   if (typeof exercise.maxPlannedWeightPerSide === 'number') {
-    const totalWeight =
-      typeof exercise.maxPlannedWeight === 'number'
-        ? exercise.maxPlannedWeight
-        : exercise.maxPlannedWeightPerSide * 2
-    return formatPerHandWithTotal(
-      exercise.maxPlannedWeightPerSide,
-      totalWeight,
-      exercise.weightUnit,
-    )
+    return formatPerHandValue(exercise.maxPlannedWeightPerSide, exercise.weightUnit)
   }
 
   if (typeof exercise.maxPlannedWeight === 'number') {
@@ -167,7 +143,12 @@ export function formatPlannedWeightDetails(exercise: PlannedExercise): string {
   }
 
   if (typeof exercise.plannedWeightPerSide === 'number') {
-    return `${formatDualWeightValue(exercise.plannedWeightPerSide, exercise.weightUnit)} на кожну руку`
+    const totalWeight =
+      typeof exercise.plannedWeight === 'number'
+        ? formatDualWeightValue(exercise.plannedWeight, exercise.weightUnit)
+        : formatDualWeightValue(exercise.plannedWeightPerSide * 2, exercise.weightUnit)
+
+    return `${formatDualWeightValue(exercise.plannedWeightPerSide, exercise.weightUnit)} на кожну руку (total: ${totalWeight})`
   }
 
   if (typeof exercise.plannedWeight !== 'number') {
