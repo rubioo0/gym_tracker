@@ -67,12 +67,6 @@ function normalizeWeightUnit(unit?: string): 'kg' | 'lbs' {
   return 'lbs'
 }
 
-function formatWeightInLbs(value: number, unit?: string): string {
-  const normalizedUnit = normalizeWeightUnit(unit)
-  const lbsValue = normalizedUnit === 'lbs' ? value : value * LBS_PER_KG
-  return `${Number(lbsValue.toFixed(2)).toString()} lbs`
-}
-
 function convertToDisplayedLbs(value: number, unit?: string): number {
   const normalizedUnit = normalizeWeightUnit(unit)
   const lbsValue = normalizedUnit === 'lbs' ? value : value * LBS_PER_KG
@@ -138,6 +132,7 @@ function App() {
   const [csvMode, setCsvMode] = useState<ProgramMode>('main')
   const [csvFocusTarget, setCsvFocusTarget] = useState('biceps')
   const [csvDurationWeeks, setCsvDurationWeeks] = useState(8)
+  const [csvHardOverwrite, setCsvHardOverwrite] = useState(false)
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([])
   const [selectedRunIds, setSelectedRunIds] = useState<string[]>([])
 
@@ -629,6 +624,7 @@ function App() {
         track: csvTrack,
         focusTarget: csvFocusTarget,
         durationWeeks: csvDurationWeeks,
+        hardOverwrite: csvHardOverwrite,
       })
 
       if (result.status === 'conflict') {
@@ -666,8 +662,9 @@ function App() {
         result.warnings.length > 0 ? ` Warnings: ${result.warnings.join(' ')}` : ''
 
       if (result.operation === 'updated') {
+        const overwritePrefix = csvHardOverwrite ? 'Hard overwrite enabled. ' : ''
         setDataMessage(
-          `Updated "${result.template.name}" from ${csvFileName}: ${result.diff.updatedExercises} changed, ${result.diff.addedExercises} added, ${result.diff.removedExercises} removed, ${result.diff.preservedExerciseIds} progression IDs preserved, ${result.diff.preservedSessions} non-imported sessions preserved.${warningSuffix}`,
+          `${overwritePrefix}Updated "${result.template.name}" from ${csvFileName}: ${result.diff.updatedExercises} changed, ${result.diff.addedExercises} added, ${result.diff.removedExercises} removed, ${result.diff.preservedExerciseIds} progression IDs preserved, ${result.diff.preservedSessions} non-imported sessions preserved.${warningSuffix}`,
         )
       } else {
         setDataMessage(
@@ -1456,10 +1453,7 @@ function App() {
                             {exerciseLog.skipped
                               ? 'skipped'
                               : exerciseLog.actualWeight !== undefined
-                                ? formatWeightInLbs(
-                                    exerciseLog.actualWeight,
-                                    exerciseLog.weightUnit,
-                                  )
+                                ? `${exerciseLog.actualWeight} ${exerciseLog.weightUnit ?? ''}`.trim()
                                 : 'done'}
                           </span>
                         </div>
@@ -1573,6 +1567,15 @@ function App() {
                           : 8,
                       )
                     }}
+                  />
+                </label>
+
+                <label className="inline-field">
+                  Hard overwrite exercises
+                  <input
+                    type="checkbox"
+                    checked={csvHardOverwrite}
+                    onChange={(event) => setCsvHardOverwrite(event.target.checked)}
                   />
                 </label>
               </div>

@@ -254,6 +254,75 @@ describe('csv template upsert', () => {
     expect(updated.diff.updatedExercises).toBe(1)
   })
 
+  it('hard overwrite replaces target session exercises and keeps history-compatible sessions', () => {
+    const existingTemplate: ProgramTemplate = {
+      id: 'manual-upper-1',
+      name: 'Manual Upper',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'biceps',
+      note: 'CSV import source: Book 2.csv',
+      sessions: [
+        {
+          id: 'manual-upper-1-session-1',
+          name: 'Upper A',
+          order: 1,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'manual-upper-1-ex-legacy',
+              name: 'Legacy Curl',
+              sets: '4 sets',
+              reps: '12',
+              plannedWeight: 20,
+              weightUnit: 'kg',
+            },
+          ],
+        },
+        {
+          id: 'manual-upper-1-session-2',
+          name: 'Upper B',
+          order: 2,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'manual-upper-1-ex-99',
+              name: 'Face Pull',
+              sets: '3 sets',
+              reps: '15',
+            },
+          ],
+        },
+      ],
+    }
+
+    const result = upsertProgramTemplateFromCsv({
+      templates: [existingTemplate],
+      csvText: BASE_CSV,
+      fileName: 'Book 2.csv',
+      hardOverwrite: true,
+    })
+
+    expect(result.status).toBe('success')
+    if (result.status !== 'success') {
+      throw new Error('Expected success result')
+    }
+
+    expect(result.operation).toBe('updated')
+    expect(result.template.sessions).toHaveLength(2)
+    expect(result.template.sessions[1].id).toBe('manual-upper-1-session-2')
+    expect(result.template.sessions[0].exercises).toHaveLength(3)
+    expect(result.template.sessions[0].exercises[0].id).toBe('manual-upper-1-ex-1')
+    expect(result.template.sessions[0].exercises[1].id).toBe('manual-upper-1-ex-2')
+    expect(result.diff.preservedExerciseIds).toBe(0)
+    expect(result.diff.addedExercises).toBe(3)
+    expect(result.diff.removedExercises).toBe(1)
+    expect(result.diff.updatedExercises).toBe(3)
+    expect(result.warnings.some((warning) => warning.includes('Hard overwrite mode'))).toBe(
+      true,
+    )
+  })
+
   it('returns conflict when template-id and source-file-name resolve to different templates', () => {
     const templateById: ProgramTemplate = {
       id: 'template-a',

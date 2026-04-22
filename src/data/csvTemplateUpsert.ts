@@ -18,6 +18,7 @@ interface CsvTemplateUpsertOptions {
   track?: TrackType
   focusTarget?: string
   durationWeeks?: number
+  hardOverwrite?: boolean
 }
 
 export interface CsvTemplateDiff {
@@ -412,16 +413,42 @@ export function upsertProgramTemplateFromCsv(
   }
 
   const sessionResolution = resolveTargetSession(existingTemplate, exportedSessionId)
-  const mergeResult = mergeExercisesByIdentity(
-    existingTemplate.id,
-    importedTemplate.id,
-    sessionResolution.session.exercises,
-    importedSession.exercises,
-  )
+  const shouldHardOverwrite = options.hardOverwrite === true
+  const warnings = [...sessionResolution.warnings]
+
+  let mergedExercises: ExerciseTemplate[]
+  let preservedExerciseIds: number
+  let addedExercises: number
+  let removedExercises: number
+  let updatedExercises: number
+
+  if (shouldHardOverwrite) {
+    mergedExercises = importedSession.exercises
+    preservedExerciseIds = 0
+    addedExercises = importedSession.exercises.length
+    removedExercises = sessionResolution.session.exercises.length
+    updatedExercises = importedSession.exercises.length
+    warnings.push(
+      'Hard overwrite mode replaced all exercises in the target session and did not preserve progression IDs.',
+    )
+  } else {
+    const mergeResult = mergeExercisesByIdentity(
+      existingTemplate.id,
+      importedTemplate.id,
+      sessionResolution.session.exercises,
+      importedSession.exercises,
+    )
+
+    mergedExercises = mergeResult.exercises
+    preservedExerciseIds = mergeResult.preservedExerciseIds
+    addedExercises = mergeResult.addedExercises
+    removedExercises = mergeResult.removedExercises
+    updatedExercises = mergeResult.updatedExercises
+  }
 
   const mergedTargetSession: SessionTemplate = {
     ...sessionResolution.session,
-    exercises: mergeResult.exercises,
+    exercises: mergedExercises,
   }
 
   const mergedSessions = existingTemplate.sessions.map((session, index) =>
@@ -445,13 +472,13 @@ export function upsertProgramTemplateFromCsv(
     template: mergedTemplate,
     nextTemplates,
     diff: {
-      preservedExerciseIds: mergeResult.preservedExerciseIds,
-      addedExercises: mergeResult.addedExercises,
-      removedExercises: mergeResult.removedExercises,
-      updatedExercises: mergeResult.updatedExercises,
-      totalExercises: mergeResult.exercises.length,
+      preservedExerciseIds,
+      addedExercises,
+      removedExercises,
+      updatedExercises,
+      totalExercises: mergedExercises.length,
       preservedSessions: Math.max(0, mergedSessions.length - 1),
     },
-    warnings: sessionResolution.warnings,
+    warnings,
   }
 }
