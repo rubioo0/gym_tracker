@@ -134,6 +134,9 @@ export interface PlannedExercise {
   plannedLoadLabel?: string
   progressionNote?: string
   nextTargetHint?: string
+  maxPlannedWeight?: number
+  maxPlannedWeightPerSide?: number
+  maxWeightExplanation?: string
   note?: string
   reference?: ExerciseReference
 }

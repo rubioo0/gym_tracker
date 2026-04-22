@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import type { PlannedExercise } from '../../domain/types'
 import {
+  formatPlannedMaxWeightOverview,
   formatPlannedWeightOverview,
   getExerciseCategory,
   getExerciseCategoryLabel,
@@ -19,10 +21,13 @@ export function SessionExerciseCardList({
   selectedExerciseId,
   onOpenExercise,
 }: SessionExerciseCardListProps) {
+  const [infoExerciseId, setInfoExerciseId] = useState<string | null>(null)
+
   return (
     <ol className="exercise-card-list" aria-label="Planned exercises">
       {exercises.map((exercise, index) => {
         const isActive = selectedExerciseId === exercise.id
+        const isInfoOpen = infoExerciseId === exercise.id
         const category = getExerciseCategory(exercise.name)
         const categoryLabel = getExerciseCategoryLabel(category)
 
@@ -58,8 +63,37 @@ export function SessionExerciseCardList({
                   <strong>Weight</strong>
                   {formatPlannedWeightOverview(exercise)}
                 </span>
+                <span className="exercise-chip">
+                  <strong>Max</strong>
+                  {formatPlannedMaxWeightOverview(exercise)}
+                </span>
               </div>
             </button>
+
+            {exercise.maxWeightExplanation ? (
+              <div className="exercise-card-info-wrap">
+                <button
+                  type="button"
+                  className="exercise-card-info-button"
+                  aria-expanded={isInfoOpen}
+                  aria-controls={`exercise-info-${exercise.id}`}
+                  onClick={() => {
+                    setInfoExerciseId((current) =>
+                      current === exercise.id ? null : exercise.id,
+                    )
+                  }}
+                >
+                  i
+                </button>
+                <span className="exercise-card-info-label">How max is calculated</span>
+              </div>
+            ) : null}
+
+            {isInfoOpen && exercise.maxWeightExplanation ? (
+              <p id={`exercise-info-${exercise.id}`} className="exercise-card-info-panel">
+                {exercise.maxWeightExplanation}
+              </p>
+            ) : null}
           </li>
         )
       })}

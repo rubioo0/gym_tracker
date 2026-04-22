@@ -22,7 +22,7 @@ describe('csv import', () => {
       'successfulTrackSessions',
     )
     expect(template.sessions[0].exercises[0].progressionRule?.frequency).toBe(2)
-    expect(template.sessions[0].exercises[0].progressionRule?.maxValue).toBe(40)
+    expect(template.sessions[0].exercises[0].progressionRule?.maxValue).toBe(45)
   })
 
   it('parses multiline quoted progression fields', () => {
@@ -39,7 +39,7 @@ describe('csv import', () => {
     const exercise = template.sessions[0].exercises[0]
     expect(exercise.progressionRule?.amount).toBe(2.5)
     expect(exercise.progressionRule?.frequency).toBe(2)
-    expect(exercise.progressionRule?.maxValue).toBe(35)
+    expect(exercise.progressionRule?.maxValue).toBe(40)
   })
 
   it('stores image links as image references', () => {
@@ -58,7 +58,7 @@ describe('csv import', () => {
     expect(exercise.reference?.videoUrl).toBeUndefined()
   })
 
-  it('normalizes explicit progression format to session frequency', () => {
+  it('parses explicit progression format with week frequency unit', () => {
     const csv = `1,Dumbbell Curl,4 sets,12,body + 10 kg,+5kg (2.5) | 2week,https://example.com/curl`
 
     const template = importProgramTemplateFromCsv(csv, {
@@ -73,9 +73,9 @@ describe('csv import', () => {
     expect(exercise.progressionRule?.amount).toBe(5)
     expect(exercise.progressionRule?.amountPerSide).toBe(2.5)
     expect(exercise.progressionRule?.frequency).toBe(2)
-    expect(exercise.progressionRule?.frequencyUnit).toBe('session')
+    expect(exercise.progressionRule?.frequencyUnit).toBe('week')
     expect(exercise.progressionRule?.note).toContain('(2.5)')
-    expect(exercise.progressionRule?.maxValue).toBe(40)
+    expect(exercise.progressionRule?.maxValue).toBe(30)
   })
 
   it('parses supported load formats from Навантаження column', () => {
@@ -125,10 +125,10 @@ describe('csv import', () => {
     expect(exercise.plannedLoadLabel).toBe('10 kg (5)')
     expect(exercise.progressionRule?.amount).toBe(5)
     expect(exercise.progressionRule?.amountPerSide).toBe(2.5)
-    expect(exercise.progressionRule?.maxValue).toBe(40)
+    expect(exercise.progressionRule?.maxValue).toBe(30)
   })
 
-  it('scales automatic max value by selected duration', () => {
+  it('uses fixed 8-week duration for automatic max value', () => {
     const csv = `1,Weighted Dip,3,8,10 kg,+5kg | 1week,-`
 
     const shortTemplate = importProgramTemplateFromCsv(csv, {
@@ -149,8 +149,8 @@ describe('csv import', () => {
       durationWeeks: 8,
     })
 
-    expect(shortTemplate.sessions[0].exercises[0].progressionRule?.maxValue).toBe(40)
-    expect(defaultTemplate.sessions[0].exercises[0].progressionRule?.maxValue).toBe(70)
+    expect(shortTemplate.sessions[0].exercises[0].progressionRule?.maxValue).toBe(45)
+    expect(defaultTemplate.sessions[0].exercises[0].progressionRule?.maxValue).toBe(45)
   })
 
   it('extracts export metadata for round-trip template updates', () => {

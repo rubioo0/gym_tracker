@@ -232,6 +232,8 @@ button:disabled:hover {
 
 .exercise-card-item {
   margin: 0;
+  display: grid;
+  gap: 0.35rem;
 }
 
 .exercise-card {
@@ -350,6 +352,46 @@ button:disabled:hover {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-size: 0.72rem;
+}
+
+.exercise-card-info-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.exercise-card-info-button {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg-soft);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.exercise-card-info-button:hover {
+  background: var(--accent-bg);
+}
+
+.exercise-card-info-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.exercise-card-info-panel {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-a);
+  padding: 0.45rem 0.55rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
 }
 
 .exercise-modal-backdrop {

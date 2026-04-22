@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PlannedExercise } from '../../domain/types'
 import {
+  formatPlannedMaxWeightOverview,
   formatPlannedWeightDetails,
   formatPlannedWeightOverview,
   getEmbeddableVideoUrl,
@@ -48,7 +49,7 @@ describe('sessionPlanUtils planned weight formatters', () => {
       plannedLoadLabel: '10 kg (5)',
     })
 
-    expect(formatPlannedWeightOverview(exercise)).toBe('5 kg на кожну руку')
+    expect(formatPlannedWeightOverview(exercise)).toBe('5 kg на кожну руку (10 kg total)')
     expect(formatPlannedWeightDetails(exercise)).toBe('11.0 lbs (5.0 kg) на кожну руку')
   })
 
@@ -84,8 +85,19 @@ describe('sessionPlanUtils planned weight formatters', () => {
       plannedLoadLabel: '44.1 lbs (22.05)',
     })
 
-    expect(formatPlannedWeightOverview(exercise)).toBe('22.1 lbs на кожну руку')
+    expect(formatPlannedWeightOverview(exercise)).toBe(
+      '22.1 lbs на кожну руку (44.1 lbs total)',
+    )
     expect(formatPlannedWeightDetails(exercise)).toBe('22.1 lbs (10.0 kg) на кожну руку')
+  })
+
+  it('formats max overview from max planned fields', () => {
+    const exercise = makeExercise({
+      maxPlannedWeight: 95,
+      weightUnit: 'lbs',
+    })
+
+    expect(formatPlannedMaxWeightOverview(exercise)).toBe('95 lbs')
   })
 
   it('keeps fallback labels in original units for overview', () => {
