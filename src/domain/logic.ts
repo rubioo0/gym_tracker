@@ -67,9 +67,6 @@ function formatNumber(value: number): string {
   return Number(value.toFixed(2)).toString()
 }
 
-const LBS_PER_KG = 2.2046226218
-const KG_PER_LB = 0.45359237
-
 function normalizeWeightUnitForProgression(
   unit: string | undefined,
 ): 'kg' | 'lbs' | undefined {
@@ -87,22 +84,6 @@ function normalizeWeightUnitForProgression(
   }
 
   return undefined
-}
-
-function convertWeightValue(
-  value: number,
-  fromUnit: 'kg' | 'lbs',
-  toUnit: 'kg' | 'lbs',
-): number {
-  if (fromUnit === toUnit) {
-    return value
-  }
-
-  if (fromUnit === 'kg' && toUnit === 'lbs') {
-    return value * LBS_PER_KG
-  }
-
-  return value * KG_PER_LB
 }
 
 function buildPlannedLoadLabel(
@@ -304,7 +285,6 @@ function getLatestCompletedActualWeight(
   runLogs: WorkoutLog[],
   exerciseId: string,
   targetWeightUnit: string | undefined,
-  minimumBaselineWeight: number | undefined,
 ): number | undefined {
   const normalizedTargetWeightUnit = normalizeWeightUnitForProgression(targetWeightUnit)
 
@@ -329,23 +309,12 @@ function getLatestCompletedActualWeight(
         return exerciseLog.actualWeight
       }
 
-      const convertedWeight = Number(
-        convertWeightValue(
-          exerciseLog.actualWeight,
-          normalizedLogWeightUnit,
-          normalizedTargetWeightUnit,
-        ).toFixed(2),
-      )
-
-      if (
-        normalizedLogWeightUnit !== normalizedTargetWeightUnit &&
-        typeof minimumBaselineWeight === 'number' &&
-        Number.isFinite(minimumBaselineWeight)
-      ) {
-        return Number(Math.max(convertedWeight, minimumBaselineWeight).toFixed(2))
+      if (normalizedLogWeightUnit !== normalizedTargetWeightUnit) {
+        // Historical logs with a different unit are ignored as progression baselines.
+        continue
       }
 
-      return convertedWeight
+      return Number(exerciseLog.actualWeight.toFixed(2))
     }
   }
 
@@ -371,7 +340,6 @@ export function buildPlannedSession(
         runLogs,
         exercise.id,
         exercise.weightUnit,
-        exercise.plannedWeight,
       )
 
       return getPlannedExercise(

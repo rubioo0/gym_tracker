@@ -70,12 +70,21 @@ function formatConvertedNumber(value: number): string {
   return value.toFixed(1)
 }
 
+function formatOverviewWeightNumber(value: number, unit?: string): string {
+  const normalizedUnit = normalizeWeightUnitForConversion(unit)
+  if (normalizedUnit === 'lbs') {
+    return Number(value.toFixed(1)).toString()
+  }
+
+  return formatWeightNumber(value)
+}
+
 function formatWeightValue(value: number, unit?: string): string {
-  return `${formatWeightNumber(value)} ${unit ?? 'kg'}`.trim()
+  return `${formatOverviewWeightNumber(value, unit)} ${unit ?? 'kg'}`.trim()
 }
 
 function formatPerHandValue(value: number, unit?: string): string {
-  return `${formatWeightNumber(value)} ${unit ?? 'kg'} на кожну руку`
+  return `${formatOverviewWeightNumber(value, unit)} ${unit ?? 'kg'} на кожну руку`
 }
 
 function formatDualWeightValue(value: number, unit?: string): string {
