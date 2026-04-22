@@ -76,6 +76,18 @@ describe('sessionPlanUtils planned weight formatters', () => {
     expect(formatPlannedWeightDetails(exercise)).toBe('45.0 lbs (20.4 kg)')
   })
 
+  it('rounds lbs overview values to one decimal place', () => {
+    const exercise = makeExercise({
+      plannedWeight: 44.1,
+      plannedWeightPerSide: 22.05,
+      weightUnit: 'lbs',
+      plannedLoadLabel: '44.1 lbs (22.05)',
+    })
+
+    expect(formatPlannedWeightOverview(exercise)).toBe('22.1 lbs на кожну руку')
+    expect(formatPlannedWeightDetails(exercise)).toBe('22.1 lbs (10.0 kg) на кожну руку')
+  })
+
   it('keeps fallback labels in original units for overview', () => {
     const exercise = makeExercise({
       plannedLoadLabel: 'body + 7.5 kg',

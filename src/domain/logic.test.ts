@@ -137,7 +137,7 @@ describe('logic helpers', () => {
     expect(planned.exercises[0].plannedLoadLabel).toBe('body + 1 kg')
   })
 
-  it('converts latest actual weight to exercise unit before progression baseline', () => {
+  it('ignores latest actual weight when it uses a different unit', () => {
     const run: FocusRun = {
       id: 'run-1',
       templateId: 'template-1',
@@ -211,11 +211,11 @@ describe('logic helpers', () => {
     ]
 
     const planned = buildPlannedSession(run, template, workoutLogs)
-    expect(planned.exercises[0].plannedWeight).toBe(13.52)
-    expect(planned.exercises[0].plannedLoadLabel).toBe('body + 13.52 lbs')
+    expect(planned.exercises[0].plannedWeight).toBe(12.5)
+    expect(planned.exercises[0].plannedLoadLabel).toBe('body + 12.5 lbs')
   })
 
-  it('does not let converted cross-unit baseline drop below configured planned weight', () => {
+  it('keeps configured split-load baseline when latest log uses different unit', () => {
     const run: FocusRun = {
       id: 'run-1',
       templateId: 'template-1',
