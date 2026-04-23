@@ -150,6 +150,39 @@ export interface PlannedSession {
   exercises: PlannedExercise[]
 }
 
+export interface CalendarSessionExercise {
+  id: string
+  name: string
+  sets: string
+  reps: string
+  plannedWeight?: number
+  plannedWeightPerSide?: number
+  weightUnit?: string
+  actualWeight?: number
+  completed?: boolean
+  skipped?: boolean
+}
+
+export interface CalendarSession {
+  sessionIndex: number
+  sessionId: string
+  sessionName: string
+  track: TrackType
+  loggedDate?: string
+  projectedDate?: string
+  exercises: CalendarSessionExercise[]
+  isCompleted: boolean
+}
+
+export interface ProgramCalendar {
+  runId: string
+  templateId: string
+  startDate: string
+  estimatedEndDate: string
+  avgDaysBetweenSessions: number
+  sessions: CalendarSession[]
+}
+
 export interface AppState {
   programTemplates: ProgramTemplate[]
   focusRuns: FocusRun[]

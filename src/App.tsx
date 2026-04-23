@@ -13,12 +13,14 @@ import { exportProgramTemplateToCsv } from './data/csvExport'
 import { extractCsvImportMetadata } from './data/csvImport'
 import {
   buildPlannedSession,
+  buildProgramCalendar,
   getActiveRuns,
   getSuggestedRun,
   getTemplateById,
 } from './domain/logic'
 import { appReducer } from './domain/reducer'
 import { SessionPlanPanel } from './components/session/SessionPlanPanel'
+import { ProgramCalendarView } from './components/calendar/ProgramCalendarView'
 import type {
   ExerciseDifficulty,
   FocusRun,
@@ -31,7 +33,7 @@ import type {
 } from './domain/types'
 import './App.css'
 
-type AppTab = 'home' | 'runs' | 'session' | 'log' | 'history' | 'data'
+type AppTab = 'home' | 'runs' | 'session' | 'log' | 'history' | 'calendar' | 'data'
 
 const tabs: { id: AppTab; label: string }[] = [
   { id: 'home', label: 'Головна' },
@@ -39,6 +41,7 @@ const tabs: { id: AppTab; label: string }[] = [
   { id: 'session', label: 'План сесії' },
   { id: 'log', label: 'Завершити / Логування' },
   { id: 'history', label: 'Історія' },
+  { id: 'calendar', label: 'Календар' },
   { id: 'data', label: 'Дані' },
 ]
 
@@ -187,6 +190,14 @@ function App() {
 
     return buildPlannedSession(previewRun, previewTemplate, state.workoutLogs)
   }, [plannedSession, previewRun, previewTemplate, state.workoutLogs])
+
+  const programCalendar = useMemo(() => {
+    if (!selectedRun || !selectedTemplate) {
+      return null
+    }
+
+    return buildProgramCalendar(selectedRun, selectedTemplate, state.workoutLogs)
+  }, [selectedRun, selectedTemplate, state.workoutLogs])
 
   const planKey = plannedSession
     ? `${plannedSession.run.id}:${plannedSession.session.id}`
@@ -1441,6 +1452,8 @@ function App() {
           </article>
         </section>
       )}
+
+      {activeTab === 'calendar' && <ProgramCalendarView calendar={programCalendar} />}
 
       {activeTab === 'data' && (
         <section className="panel-grid">
