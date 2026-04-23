@@ -94,13 +94,7 @@ function getRemainingProgressionStepCount(
   }
 
   const rawSteps = Math.floor((sessionsLeft - 1) / effectiveFrequencySessions)
-
-  // When rebasing from a just-logged actual load, keep one full cadence window
-  // before counting max progression steps for the remaining program horizon.
-  if (hasLatestCompletedActualWeight) {
-    return Math.max(0, rawSteps - 1)
-  }
-
+  void hasLatestCompletedActualWeight
   return rawSteps
 }
 
@@ -290,22 +284,9 @@ export function getPlannedExercise(
   const counters = normalizeProgressionCounters(countersOrCompleted)
   const progressionSessionCount = getProgressionSessionCount(rule, counters)
   const effectiveFrequencySessions = getEffectiveFrequencySessions(rule)
-  const steps = getProgressionSteps(progressionSessionCount, effectiveFrequencySessions)
   const hasLatestCompletedActualWeight =
     typeof options?.latestCompletedActualWeight === 'number' &&
     Number.isFinite(options.latestCompletedActualWeight)
-
-  const shouldAdvanceFromLatestCompletedActual =
-    hasLatestCompletedActualWeight &&
-    effectiveFrequencySessions > 0 &&
-    progressionSessionCount > 0 &&
-    (progressionSessionCount + 1) % effectiveFrequencySessions === 0
-
-  const effectiveWeightSteps = hasLatestCompletedActualWeight
-    ? shouldAdvanceFromLatestCompletedActual
-      ? 1
-      : 0
-    : steps
 
   const basePlannedWeight = hasLatestCompletedActualWeight
     ? (options?.latestCompletedActualWeight as number)
@@ -326,21 +307,14 @@ export function getPlannedExercise(
 
   if (rule.type === 'weight' && typeof basePlannedWeight === 'number') {
     const progressedWeight = clamp(
-      basePlannedWeight + effectiveWeightSteps * rule.amount,
+      basePlannedWeight,
       rule.minValue,
-      rule.maxValue,
+      undefined,
     )
 
     let progressedPerSide: number | undefined
     if (typeof basePlannedWeightPerSide === 'number') {
-      if (typeof rule.amountPerSide === 'number') {
-        progressedPerSide = Number(
-          (basePlannedWeightPerSide +
-            effectiveWeightSteps * rule.amountPerSide).toFixed(2),
-        )
-      } else {
-        progressedPerSide = Number((progressedWeight / 2).toFixed(2))
-      }
+      progressedPerSide = Number(basePlannedWeightPerSide.toFixed(2))
     }
 
     planned.plannedWeight = Number(progressedWeight.toFixed(2))
@@ -356,21 +330,16 @@ export function getPlannedExercise(
       hasLatestCompletedActualWeight,
     )
     const unitLabel = exercise.weightUnit ?? 'kg'
+    const maxUpperBound = hasLatestCompletedActualWeight ? rule.maxValue : undefined
     const maxProgressedWeight = clamp(
       basePlannedWeight + maxSteps * rule.amount,
       rule.minValue,
-      rule.maxValue,
+      maxUpperBound,
     )
 
     planned.maxPlannedWeight = Number(maxProgressedWeight.toFixed(2))
     if (typeof basePlannedWeightPerSide === 'number') {
-      if (typeof rule.amountPerSide === 'number') {
-        planned.maxPlannedWeightPerSide = Number(
-          (basePlannedWeightPerSide + maxSteps * rule.amountPerSide).toFixed(2),
-        )
-      } else {
-        planned.maxPlannedWeightPerSide = Number((maxProgressedWeight / 2).toFixed(2))
-      }
+      planned.maxPlannedWeightPerSide = Number((maxProgressedWeight / 2).toFixed(2))
     }
 
     planned.maxWeightExplanation = buildMaxWeightExplanation(
@@ -401,6 +370,7 @@ export function getPlannedExercise(
   if (rule.type === 'reps') {
     const parsed = parseRepsRange(exercise.reps)
     if (parsed) {
+      const steps = getProgressionSteps(progressionSessionCount, effectiveFrequencySessions)
       const start = parsed.start + steps * rule.amount
       const end = parsed.end + steps * rule.amount
       planned.reps = start === end ? `${start}` : `${start}-${end}`

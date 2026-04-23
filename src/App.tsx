@@ -51,9 +51,6 @@ const statusLabel: Record<RunStatus, string> = {
   archived: 'Архівовано',
 }
 
-const LBS_PER_KG = 2.2046226218
-const KG_PER_LB = 0.45359237
-
 function normalizeWeightUnit(unit?: string): 'kg' | 'lbs' {
   const normalized = unit?.toLowerCase() ?? ''
   if (normalized.includes('lb')) {
@@ -65,18 +62,6 @@ function normalizeWeightUnit(unit?: string): 'kg' | 'lbs' {
   }
 
   return 'lbs'
-}
-
-function convertToDisplayedLbs(value: number, unit?: string): number {
-  const normalizedUnit = normalizeWeightUnit(unit)
-  const lbsValue = normalizedUnit === 'lbs' ? value : value * LBS_PER_KG
-  return Number(lbsValue.toFixed(2))
-}
-
-function convertFromDisplayedLbs(value: number, unit?: string): number {
-  const normalizedUnit = normalizeWeightUnit(unit)
-  const storedValue = normalizedUnit === 'lbs' ? value : value * KG_PER_LB
-  return Number(storedValue.toFixed(2))
 }
 
 function formatDateTime(iso: string): string {
@@ -223,7 +208,7 @@ function App() {
         skipped: false,
         actualWeight:
           typeof exercise.plannedWeight === 'number'
-            ? convertToDisplayedLbs(exercise.plannedWeight, exercise.weightUnit)
+            ? Number(exercise.plannedWeight.toFixed(2))
             : undefined,
       })),
     )
@@ -340,31 +325,13 @@ function App() {
       return
     }
 
-    const normalizedExerciseInputs = exerciseInputs.map((exerciseInput) => {
-      if (typeof exerciseInput.actualWeight !== 'number') {
-        return exerciseInput
-      }
-
-      const matchingExercise = plannedSession.exercises.find(
-        (exercise) => exercise.id === exerciseInput.exerciseId,
-      )
-
-      return {
-        ...exerciseInput,
-        actualWeight: convertFromDisplayedLbs(
-          exerciseInput.actualWeight,
-          matchingExercise?.weightUnit,
-        ),
-      }
-    })
-
     dispatch({
       type: 'logSession',
       payload: {
         runId: plannedSession.run.id,
         completedAt: new Date().toISOString(),
         successful: sessionSuccessful,
-        exerciseInputs: normalizedExerciseInputs,
+        exerciseInputs,
         activityInputs,
         sessionNote,
       },
@@ -1152,7 +1119,7 @@ function App() {
                         <th>Exercise</th>
                         <th>Completed</th>
                         <th>Skipped</th>
-                        <th>Actual weight (lbs)</th>
+                        <th>Actual weight</th>
                         <th>Difficulty</th>
                         <th>Note</th>
                       </tr>
@@ -1193,18 +1160,26 @@ function App() {
                               />
                             </td>
                             <td>
-                              <input
-                                type="number"
-                                value={exerciseInput?.actualWeight ?? ''}
-                                onChange={(event) =>
-                                  updateExerciseInput(exercise.id, {
-                                    actualWeight:
-                                      event.target.value === ''
-                                        ? undefined
-                                        : Number(event.target.value),
-                                  })
-                                }
-                              />
+                              {(() => {
+                                const unitLabel = normalizeWeightUnit(exercise.weightUnit)
+                                return (
+                                  <label className="stacked-field">
+                                    <span>{unitLabel}</span>
+                                    <input
+                                      type="number"
+                                      value={exerciseInput?.actualWeight ?? ''}
+                                      onChange={(event) =>
+                                        updateExerciseInput(exercise.id, {
+                                          actualWeight:
+                                            event.target.value === ''
+                                              ? undefined
+                                              : Number(event.target.value),
+                                        })
+                                      }
+                                    />
+                                  </label>
+                                )
+                              })()}
                             </td>
                             <td>
                               <select
@@ -1288,7 +1263,7 @@ function App() {
 
                         <div className="log-input-grid">
                           <label className="stacked-field">
-                            Actual weight (lbs)
+                            {`Actual weight (${normalizeWeightUnit(exercise.weightUnit)})`}
                             <input
                               type="number"
                               value={exerciseInput?.actualWeight ?? ''}

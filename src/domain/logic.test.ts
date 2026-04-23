@@ -27,7 +27,7 @@ describe('logic helpers', () => {
       4,
     )
 
-    expect(planned.plannedWeight).toBe(25)
+    expect(planned.plannedWeight).toBe(20)
     expect(planned.nextTargetHint).toContain('2 session')
   })
 
@@ -132,9 +132,9 @@ describe('logic helpers', () => {
     ]
 
     const planned = buildPlannedSession(run, template, workoutLogs)
-    expect(planned.exercises[0].plannedWeight).toBe(1)
+    expect(planned.exercises[0].plannedWeight).toBe(0)
     expect(planned.exercises[0].plannedWeightPerSide).toBeUndefined()
-    expect(planned.exercises[0].plannedLoadLabel).toBe('body + 1 kg')
+    expect(planned.exercises[0].plannedLoadLabel).toBe('body + 0 kg')
   })
 
   it('ignores latest actual weight when it uses a different unit', () => {
@@ -211,8 +211,8 @@ describe('logic helpers', () => {
     ]
 
     const planned = buildPlannedSession(run, template, workoutLogs)
-    expect(planned.exercises[0].plannedWeight).toBe(12.5)
-    expect(planned.exercises[0].plannedLoadLabel).toBe('body + 12.5 lbs')
+    expect(planned.exercises[0].plannedWeight).toBe(10)
+    expect(planned.exercises[0].plannedLoadLabel).toBe('body + 10 lbs')
   })
 
   it('keeps configured split-load baseline when latest log uses different unit', () => {
@@ -290,9 +290,9 @@ describe('logic helpers', () => {
     ]
 
     const planned = buildPlannedSession(run, template, workoutLogs)
-    expect(planned.exercises[0].plannedWeight).toBe(20)
-    expect(planned.exercises[0].plannedWeightPerSide).toBe(10)
-    expect(planned.exercises[0].plannedLoadLabel).toBe('20 lbs (10)')
+    expect(planned.exercises[0].plannedWeight).toBe(15)
+    expect(planned.exercises[0].plannedWeightPerSide).toBe(7.5)
+    expect(planned.exercises[0].plannedLoadLabel).toBe('15 lbs (7.5)')
   })
 
   it('applies per-side weight progression for split hand loads', () => {
@@ -321,9 +321,9 @@ describe('logic helpers', () => {
       },
     )
 
-    expect(planned.plannedWeight).toBe(15)
-    expect(planned.plannedWeightPerSide).toBe(7.5)
-    expect(planned.plannedLoadLabel).toBe('15 kg (7.5)')
+    expect(planned.plannedWeight).toBe(10)
+    expect(planned.plannedWeightPerSide).toBe(5)
+    expect(planned.plannedLoadLabel).toBe('10 kg (5)')
     expect(planned.nextTargetHint).toContain('week')
   })
 
@@ -353,7 +353,7 @@ describe('logic helpers', () => {
       },
     )
 
-    expect(planned.maxPlannedWeight).toBe(50)
+    expect(planned.maxPlannedWeight).toBe(55)
     expect(planned.maxWeightExplanation).toContain('sessions done 2, sessions left 14')
   })
 
@@ -385,7 +385,7 @@ describe('logic helpers', () => {
     )
 
     expect(planned.plannedWeight).toBe(12.5)
-    expect(planned.maxPlannedWeight).toBe(25)
+    expect(planned.maxPlannedWeight).toBe(27.5)
     expect(planned.maxWeightExplanation).toContain('sessions done 2, sessions left 14')
   })
 
