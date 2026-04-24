@@ -31,9 +31,6 @@ export interface CsvImportMetadata {
 
 const DEFAULT_MODE: ProgramMode = 'main'
 const DEFAULT_TRACK: TrackType = 'upper'
-const FIXED_PROGRAM_DURATION_WEEKS = 8
-const FIXED_PROGRAM_SESSION_COUNT = 16
-const SESSIONS_PER_WEEK = FIXED_PROGRAM_SESSION_COUNT / FIXED_PROGRAM_DURATION_WEEKS
 export const CSV_METADATA_ROW_PREFIX = 'training-os-metadata'
 
 interface ParsedLoadConfig {
@@ -80,19 +77,6 @@ function extractInteger(value: string): number | undefined {
 
 function formatNumber(value: number): string {
   return Number(value.toFixed(2)).toString()
-}
-
-function normalizeDurationWeeks(durationWeeks: number | undefined): number {
-  void durationWeeks
-  return FIXED_PROGRAM_DURATION_WEEKS
-}
-
-function estimateProgramSessionCount(durationWeeks: number): number {
-  if (durationWeeks === FIXED_PROGRAM_DURATION_WEEKS) {
-    return FIXED_PROGRAM_SESSION_COUNT
-  }
-
-  return Math.max(1, Math.round(durationWeeks * SESSIONS_PER_WEEK))
 }
 
 function parseProgramMode(value: string): ProgramMode | undefined {
@@ -410,23 +394,6 @@ function parseProgressionPerSideAmount(progressionRaw: string): number | undefin
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
-function estimateProgressionSteps(
-  frequency: number,
-  frequencyUnit: ProgressionFrequencyUnit,
-  durationWeeks: number,
-  durationSessionCount: number,
-): number {
-  if (frequency <= 0) {
-    return 0
-  }
-
-  if (frequencyUnit === 'week') {
-    return Math.max(0, Math.ceil((durationWeeks - 1) / frequency))
-  }
-
-  return Math.max(0, Math.ceil((durationSessionCount - 1) / frequency))
-}
-
 function pickReferenceCell(row: string[]): string {
   // New format places reference in column 7. Legacy imports may still keep it in column 9.
   const candidates = [row[6], row[7], row[8]]
@@ -444,9 +411,6 @@ function pickReferenceCell(row: string[]): string {
 function parseProgressionRule(
   progressionRaw: string,
   fallbackType: 'weight' | 'reps',
-  plannedWeight: number | undefined,
-  durationWeeks: number,
-  durationSessionCount: number,
 ): ProgressionRule | undefined {
   if (isEmptyOrDash(progressionRaw)) {
     return undefined
@@ -470,17 +434,6 @@ function parseProgressionRule(
 
   const type = parseProgressionType(normalizedProgression, fallbackType)
 
-  let maxValue: number | undefined
-  if (type === 'weight' && typeof plannedWeight === 'number') {
-    const steps = estimateProgressionSteps(
-      frequency,
-      frequencyUnit,
-      durationWeeks,
-      durationSessionCount,
-    )
-    maxValue = Number((plannedWeight + steps * amount).toFixed(2))
-  }
-
   return {
     type,
     amount,
@@ -488,7 +441,6 @@ function parseProgressionRule(
     frequency,
     frequencyUnit,
     basis: 'successfulTrackSessions',
-    maxValue,
     note: normalizedProgression,
   }
 }
@@ -589,8 +541,6 @@ function buildExercise(
   row: string[],
   index: number,
   programId: string,
-  durationWeeks: number,
-  durationSessionCount: number,
 ): ExerciseTemplate {
   const exerciseNumber = normalizeCell(row[0] ?? '') || `${index}`
   const rawName = normalizeCell(row[1] ?? '')
@@ -608,9 +558,6 @@ function buildExercise(
   const progressionRule = parseProgressionRule(
     rawProgression,
     fallbackType,
-    parsedLoad.plannedWeight,
-    durationWeeks,
-    durationSessionCount,
   )
 
   const noteParts: string[] = []
@@ -658,11 +605,8 @@ export function importProgramTemplateFromCsv(
   const mode = options.mode ?? DEFAULT_MODE
   const track = options.track ?? DEFAULT_TRACK
   const focusTarget = options.focusTarget?.trim() || 'imported-focus'
-  const durationWeeks = normalizeDurationWeeks(options.durationWeeks)
-  const durationSessionCount = estimateProgramSessionCount(durationWeeks)
-
   const exercises = exerciseRows.map((row, index) =>
-    buildExercise(row, index + 1, programId, durationWeeks, durationSessionCount),
+    buildExercise(row, index + 1, programId),
   )
 
   return {

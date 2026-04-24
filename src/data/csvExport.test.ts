@@ -81,9 +81,10 @@ describe('csv export', () => {
     expect(firstExerciseRow).toBeDefined()
     expect(firstExerciseRow?.[1]).toBe('Barbell Curl')
     expect(firstExerciseRow?.[4]).toBe('20 kg')
-    expect(firstExerciseRow?.[8]).toBe('https://example.com/curl.mp4')
+    expect(firstExerciseRow?.[7]).toBe('https://example.com/curl.mp4')
 
     expect(result.csvText).not.toContain('Hammer Curl')
+    expect(result.csvText).not.toContain('Max Value')
   })
 
   it('reuses CSV source note as download file name when available', () => {

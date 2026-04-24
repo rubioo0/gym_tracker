@@ -21,7 +21,7 @@ function normalizeTemplateProgressionUnits(
     sessions: template.sessions.map((session) => ({
       ...session,
       exercises: session.exercises.map((exercise) => {
-        if (!exercise.progressionRule || exercise.progressionRule.frequencyUnit !== 'week') {
+        if (!exercise.progressionRule) {
           return exercise
         }
 
@@ -29,8 +29,34 @@ function normalizeTemplateProgressionUnits(
           ...exercise,
           progressionRule: {
             ...exercise.progressionRule,
-            frequencyUnit: 'session',
+            frequencyUnit:
+              exercise.progressionRule.frequencyUnit === 'week'
+                ? 'session'
+                : exercise.progressionRule.frequencyUnit,
+            maxValue: undefined,
           },
+        }
+      }),
+    })),
+  }))
+}
+
+function stripProgressionRuleMaxValues(
+  templates: ProgramTemplate[],
+): ProgramTemplate[] {
+  return templates.map((template) => ({
+    ...template,
+    sessions: template.sessions.map((session) => ({
+      ...session,
+      exercises: session.exercises.map((exercise) => {
+        if (!exercise.progressionRule) {
+          return exercise
+        }
+
+        const { maxValue: _maxValue, ...progressionRule } = exercise.progressionRule
+        return {
+          ...exercise,
+          progressionRule,
         }
       }),
     })),
@@ -227,12 +253,17 @@ export function clearAppState(): void {
 }
 
 export function exportAppStateJson(state: AppState): string {
+  const exportedState: AppState = {
+    ...state,
+    programTemplates: stripProgressionRuleMaxValues(state.programTemplates),
+  }
+
   return JSON.stringify(
     {
       backupVersion: 2,
       exportedAt: new Date().toISOString(),
       storageVersion: STORAGE_VERSION,
-      state,
+      state: exportedState,
     },
     null,
     2,
@@ -250,7 +281,7 @@ export function exportCleanAppStateJson(state: AppState): string {
   )
 
   const cleanState: AppState = {
-    programTemplates: state.programTemplates,
+    programTemplates: stripProgressionRuleMaxValues(state.programTemplates),
     focusRuns: activeAndPausedRuns,
     workoutLogs: filteredLogs,
     lastCompletedTrack: state.lastCompletedTrack,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { importStateFromJson, exportCleanAppStateJson } from './storage'
+import { exportAppStateJson, importStateFromJson, exportCleanAppStateJson } from './storage'
 
 describe('storage normalization', () => {
   it('merges duplicate active or paused runs for same template and rebinds logs', () => {
@@ -101,6 +101,52 @@ describe('storage normalization', () => {
     expect(imported.focusRuns[0].nextSessionIndex).toBe(0)
     expect(imported.workoutLogs.every((log) => log.runId === 'run-active')).toBe(true)
     expect(imported.selectedRunId).toBe('run-active')
+  })
+
+  it('strips progression maxValue from imported templates', () => {
+    const raw = JSON.stringify({
+      programTemplates: [
+        {
+          id: 'template-1',
+          name: 'Biceps',
+          mode: 'main',
+          track: 'upper',
+          focusTarget: 'biceps',
+          sessions: [
+            {
+              id: 'session-1',
+              name: 'Session 1',
+              order: 1,
+              track: 'upper',
+              exercises: [
+                {
+                  id: 'exercise-1',
+                  name: 'Curl',
+                  sets: '4',
+                  reps: '10',
+                  plannedWeight: 20,
+                  progressionRule: {
+                    type: 'weight',
+                    amount: 2.5,
+                    frequency: 2,
+                    basis: 'successfulTrackSessions',
+                    maxValue: 35,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      focusRuns: [],
+      workoutLogs: [],
+      lastCompletedTrack: null,
+      selectedRunId: null,
+    })
+
+    const imported = importStateFromJson(raw)
+    expect(imported).not.toBeNull()
+    expect(imported?.programTemplates[0].sessions[0].exercises[0].progressionRule?.maxValue).toBeUndefined()
   })
 })
 
@@ -303,5 +349,50 @@ describe('export clean state', () => {
     const parsed = JSON.parse(exported)
 
     expect(parsed.state.selectedRunId).toBeNull()
+  })
+
+  it('omits progression maxValue from exported app state backups', () => {
+    const state = {
+      programTemplates: [
+        {
+          id: 'template-1',
+          name: 'Biceps',
+          mode: 'main' as const,
+          track: 'upper' as const,
+          focusTarget: 'biceps',
+          sessions: [
+            {
+              id: 'session-1',
+              name: 'Session 1',
+              order: 1,
+              track: 'upper' as const,
+              exercises: [
+                {
+                  id: 'exercise-1',
+                  name: 'Curl',
+                  sets: '4',
+                  reps: '10',
+                  plannedWeight: 20,
+                  progressionRule: {
+                    type: 'weight' as const,
+                    amount: 2.5,
+                    frequency: 2,
+                    basis: 'successfulTrackSessions' as const,
+                    maxValue: 35,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      focusRuns: [],
+      workoutLogs: [],
+      lastCompletedTrack: null,
+      selectedRunId: null,
+    }
+
+    const exported = JSON.parse(exportAppStateJson(state as any))
+    expect(exported.state.programTemplates[0].sessions[0].exercises[0].progressionRule.maxValue).toBeUndefined()
   })
 })

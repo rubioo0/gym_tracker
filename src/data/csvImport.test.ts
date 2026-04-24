@@ -22,7 +22,7 @@ describe('csv import', () => {
       'successfulTrackSessions',
     )
     expect(template.sessions[0].exercises[0].progressionRule?.frequency).toBe(2)
-    expect(template.sessions[0].exercises[0].progressionRule?.maxValue).toBe(45)
+    expect(template.sessions[0].exercises[0].progressionRule?.maxValue).toBeUndefined()
   })
 
   it('parses multiline quoted progression fields', () => {
@@ -39,7 +39,7 @@ describe('csv import', () => {
     const exercise = template.sessions[0].exercises[0]
     expect(exercise.progressionRule?.amount).toBe(2.5)
     expect(exercise.progressionRule?.frequency).toBe(2)
-    expect(exercise.progressionRule?.maxValue).toBe(40)
+    expect(exercise.progressionRule?.maxValue).toBeUndefined()
   })
 
   it('stores image links as image references', () => {
@@ -75,7 +75,7 @@ describe('csv import', () => {
     expect(exercise.progressionRule?.frequency).toBe(2)
     expect(exercise.progressionRule?.frequencyUnit).toBe('week')
     expect(exercise.progressionRule?.note).toContain('(2.5)')
-    expect(exercise.progressionRule?.maxValue).toBe(30)
+    expect(exercise.progressionRule?.maxValue).toBeUndefined()
   })
 
   it('parses supported load formats from Навантаження column', () => {
@@ -125,10 +125,10 @@ describe('csv import', () => {
     expect(exercise.plannedLoadLabel).toBe('10 kg (5)')
     expect(exercise.progressionRule?.amount).toBe(5)
     expect(exercise.progressionRule?.amountPerSide).toBe(2.5)
-    expect(exercise.progressionRule?.maxValue).toBe(30)
+    expect(exercise.progressionRule?.maxValue).toBeUndefined()
   })
 
-  it('uses fixed 8-week duration for automatic max value', () => {
+  it('does not derive maxValue during import', () => {
     const csv = `1,Weighted Dip,3,8,10 kg,+5kg | 1week,-`
 
     const shortTemplate = importProgramTemplateFromCsv(csv, {
@@ -149,8 +149,8 @@ describe('csv import', () => {
       durationWeeks: 8,
     })
 
-    expect(shortTemplate.sessions[0].exercises[0].progressionRule?.maxValue).toBe(45)
-    expect(defaultTemplate.sessions[0].exercises[0].progressionRule?.maxValue).toBe(45)
+    expect(shortTemplate.sessions[0].exercises[0].progressionRule?.maxValue).toBeUndefined()
+    expect(defaultTemplate.sessions[0].exercises[0].progressionRule?.maxValue).toBeUndefined()
   })
 
   it('extracts export metadata for round-trip template updates', () => {

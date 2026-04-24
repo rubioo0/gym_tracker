@@ -16,7 +16,6 @@ const CSV_HEADER_ROW = [
   'Reps',
   'Base Config / Planned Weight',
   'Progression Rule',
-  'Max Value',
   'Rest',
   'Video Reference',
 ]
@@ -135,9 +134,6 @@ function buildExerciseRow(exercise: ExerciseTemplate, order: number): string[] {
     buildBaseConfigCell(exercise),
     exercise.progressionRule
       ? buildProgressionRuleCell(exercise, exercise.progressionRule)
-      : '-',
-    typeof exercise.progressionRule?.maxValue === 'number'
-      ? formatNumber(exercise.progressionRule.maxValue)
       : '-',
     '-',
     buildReferenceCell(exercise),
