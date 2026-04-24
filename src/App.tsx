@@ -111,6 +111,14 @@ function createPreviewRun(template: ProgramTemplate): FocusRun {
   }
 }
 
+function rewriteCsvSourceFileName(csvText: string, sourceFileName: string): string {
+  const replacement = `training-os-metadata,source-file-name,${sourceFileName}`
+  return csvText.replace(
+    /(^|\r?\n)training-os-metadata,source-file-name,[^\r\n]*/i,
+    (_, prefix: string) => `${prefix}${replacement}`,
+  )
+}
+
 function App() {
   const [state, dispatch] = useReducer(appReducer, undefined, loadAppState)
   const [activeTab, setActiveTab] = useState<AppTab>('home')
@@ -121,6 +129,7 @@ function App() {
   const [csvFileName, setCsvFileName] = useState('')
   const [csvUploadedFileName, setCsvUploadedFileName] = useState('')
   const [csvMetadataSourceFileName, setCsvMetadataSourceFileName] = useState('')
+  const [csvIgnoreMetadataSourceFileName, setCsvIgnoreMetadataSourceFileName] = useState(false)
   const [csvProgramName, setCsvProgramName] = useState('Imported CSV Program')
   const [csvTrack, setCsvTrack] = useState<TrackType>('upper')
   const [csvMode, setCsvMode] = useState<ProgramMode>('main')
@@ -290,7 +299,9 @@ function App() {
       return null
     }
 
-    const targetFileName = csvMetadataSourceFileName || csvUploadedFileName || csvFileName
+    const targetFileName = csvIgnoreMetadataSourceFileName
+      ? csvUploadedFileName || csvFileName
+      : csvMetadataSourceFileName || csvUploadedFileName || csvFileName
     const resolvedTemplate = targetFileName
       ? findImportedTemplateByFileName(state.programTemplates, targetFileName)
       : undefined
@@ -305,6 +316,7 @@ function App() {
   }, [
     csvFileName,
     csvMetadataSourceFileName,
+      csvIgnoreMetadataSourceFileName,
     csvRawText,
     csvUploadedFileName,
     state.programTemplates,
@@ -646,10 +658,15 @@ function App() {
       return
     }
 
+    const effectiveCsvText =
+      csvIgnoreMetadataSourceFileName && csvUploadedFileName
+        ? rewriteCsvSourceFileName(csvRawText, csvUploadedFileName)
+        : csvRawText
+
     try {
       const result = upsertProgramTemplateFromCsv({
         templates: state.programTemplates,
-        csvText: csvRawText,
+        csvText: effectiveCsvText,
         fileName: csvUploadedFileName || csvFileName || undefined,
         programName: csvProgramName,
         mode: csvMode,
@@ -1582,6 +1599,15 @@ function App() {
                   This CSV carries source-file-name metadata, so matching uses that value instead of the uploaded file name.
                 </p>
               ) : null}
+
+                      <label className="inline-field">
+                        Ignore CSV source-file-name metadata
+                        <input
+                          type="checkbox"
+                          checked={csvIgnoreMetadataSourceFileName}
+                          onChange={(event) => setCsvIgnoreMetadataSourceFileName(event.target.checked)}
+                        />
+                      </label>
 
               <div className="action-row">
                 <label className="inline-field">
