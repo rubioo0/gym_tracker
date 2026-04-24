@@ -607,6 +607,24 @@ export function buildPlannedSession(
         },
       )
 
+      const projectedLastSessionExercise = projectPlannedExerciseForSessionIndex(
+        exercise,
+        exerciseCounters,
+        {
+          latestCompletedActualWeight,
+        },
+        FIXED_PROGRAM_SESSIONS - 1,
+      )
+
+      if (typeof projectedLastSessionExercise.plannedWeight === 'number') {
+        plannedExercise.maxPlannedWeight = projectedLastSessionExercise.plannedWeight
+      }
+
+      if (typeof projectedLastSessionExercise.plannedWeightPerSide === 'number') {
+        plannedExercise.maxPlannedWeightPerSide =
+          projectedLastSessionExercise.plannedWeightPerSide
+      }
+
       plannedExercise.sessionDoneCount = exerciseCounters.completedSessionCount
       plannedExercise.sessionLeftCount = Math.max(
         0,
