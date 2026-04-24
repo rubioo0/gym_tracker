@@ -354,7 +354,7 @@ describe('logic helpers', () => {
       },
     )
 
-    expect(planned.maxPlannedWeight).toBe(50)
+    expect(planned.maxPlannedWeight).toBe(55)
     expect(planned.maxWeightExplanation).toContain('sessions left 14 (~7 weeks)')
   })
 
@@ -383,8 +383,135 @@ describe('logic helpers', () => {
       },
     )
 
-    expect(planned.maxPlannedWeight).toBe(27.5)
+    expect(planned.maxPlannedWeight).toBe(30)
     expect(planned.maxWeightExplanation).toContain('sessions left 13 (~6.5 weeks)')
+  })
+
+  it('uses imported planned weight as baseline when latest log planned weight is stale', () => {
+    const run: FocusRun = {
+      id: 'run-1',
+      templateId: 'template-1',
+      templateName: 'Template 1',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'arms',
+      status: 'active',
+      startedAt: '2026-04-10T10:00:00.000Z',
+      completedSessionCount: 3,
+      successfulSessionCount: 3,
+      nextSessionIndex: 0,
+    }
+
+    const template: ProgramTemplate = {
+      id: 'template-1',
+      name: 'Template 1',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'arms',
+      sessions: [
+        {
+          id: 'session-1',
+          name: 'Session 1',
+          order: 1,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'dips-id',
+              name: 'Бруси',
+              sets: '4 sets',
+              reps: '10',
+              plannedWeight: 15,
+              weightUnit: 'lbs',
+              isBodyweightLoad: true,
+              progressionRule: {
+                type: 'weight',
+                amount: 2.5,
+                frequency: 1,
+                frequencyUnit: 'week',
+                basis: 'successfulTrackSessions',
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    const workoutLogs: WorkoutLog[] = [
+      {
+        id: 'log-3',
+        runId: 'run-1',
+        templateId: 'template-1',
+        sessionId: 'session-1',
+        sessionName: 'Session 1',
+        track: 'upper',
+        completedAt: '2026-04-14T11:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'dips-id',
+            exerciseName: 'Бруси',
+            completed: true,
+            skipped: false,
+            plannedWeight: 12.5,
+            actualWeight: 12.5,
+            weightUnit: 'lbs',
+          },
+        ],
+        optionalActivities: [],
+      },
+      {
+        id: 'log-2',
+        runId: 'run-1',
+        templateId: 'template-1',
+        sessionId: 'session-1',
+        sessionName: 'Session 1',
+        track: 'upper',
+        completedAt: '2026-04-12T11:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'dips-id',
+            exerciseName: 'Бруси',
+            completed: true,
+            skipped: false,
+            plannedWeight: 12.5,
+            actualWeight: 12.5,
+            weightUnit: 'lbs',
+          },
+        ],
+        optionalActivities: [],
+      },
+      {
+        id: 'log-1',
+        runId: 'run-1',
+        templateId: 'template-1',
+        sessionId: 'session-1',
+        sessionName: 'Session 1',
+        track: 'upper',
+        completedAt: '2026-04-10T11:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'dips-id',
+            exerciseName: 'Бруси',
+            completed: true,
+            skipped: false,
+            plannedWeight: 12.5,
+            actualWeight: 12.5,
+            weightUnit: 'lbs',
+          },
+        ],
+        optionalActivities: [],
+      },
+    ]
+
+    const planned = buildPlannedSession(run, template, workoutLogs)
+    const calendar = buildProgramCalendar(run, template, workoutLogs)
+
+    expect(planned.exercises[0].plannedWeight).toBe(15)
+    expect(planned.exercises[0].maxPlannedWeight).toBe(30)
+    expect(planned.exercises[0].maxWeightExplanation).toContain('sessions left 13 (~6.5 weeks)')
+    expect(calendar.sessions[3].exercises[0].plannedWeight).toBe(15)
   })
 
   it('computes remaining-program max from current baseline for weekly progression', () => {
@@ -442,7 +569,7 @@ describe('logic helpers', () => {
       },
     )
 
-    expect(planned.maxPlannedWeight).toBe(65)
+    expect(planned.maxPlannedWeight).toBe(75)
     expect(planned.maxWeightExplanation).toContain('sessions left 13 (~6.5 weeks)')
   })
 

@@ -93,12 +93,10 @@ function getRemainingProgressionStepCount(
     return 0
   }
 
-  // A newly configured/logged value becomes the current baseline window.
-  // We only count full progression windows after that baseline window.
-  const fullProgressionWindows = Math.floor(
-    remainingSessionCount / effectiveFrequencySessions,
-  )
-  return Math.max(0, fullProgressionWindows - 1)
+  // The next planned value is the baseline (one session).
+  // Progression starts after that baseline session.
+  const sessionsAfterBaseline = Math.max(0, remainingSessionCount - 1)
+  return Math.floor(sessionsAfterBaseline / effectiveFrequencySessions)
 }
 
 function clamp(value: number, minValue?: number, maxValue?: number): number {
@@ -475,7 +473,8 @@ function getLatestCompletedActualWeight(
   exercise: ExerciseTemplate,
   targetWeightUnit: string | undefined,
 ): number | undefined {
-  const normalizedTargetWeightUnit = normalizeWeightUnitForProgression(targetWeightUnit)
+  let latestTimestamp = Number.NEGATIVE_INFINITY
+  let latestLog: ExerciseLog | undefined
 
   for (const runLog of runLogs) {
     const exerciseLog = runLog.exerciseLogs.find(
@@ -486,25 +485,64 @@ function getLatestCompletedActualWeight(
       continue
     }
 
-    if (
-      typeof exerciseLog.actualWeight === 'number' &&
-      Number.isFinite(exerciseLog.actualWeight)
-    ) {
-      const normalizedLogWeightUnit = normalizeWeightUnitForProgression(
-        exerciseLog.weightUnit,
-      )
-
-      if (!normalizedTargetWeightUnit || !normalizedLogWeightUnit) {
-        return exerciseLog.actualWeight
-      }
-
-      if (normalizedLogWeightUnit !== normalizedTargetWeightUnit) {
-        // Historical logs with a different unit are ignored as progression baselines.
-        continue
-      }
-
-      return Number(exerciseLog.actualWeight.toFixed(2))
+    const completedAt = new Date(runLog.completedAt).getTime()
+    if (Number.isNaN(completedAt)) {
+      continue
     }
+
+    if (completedAt > latestTimestamp) {
+      latestTimestamp = completedAt
+      latestLog = exerciseLog
+    }
+  }
+
+  if (!latestLog) {
+    return undefined
+  }
+
+  const normalizedTargetWeightUnit = normalizeWeightUnitForProgression(targetWeightUnit)
+
+  if (
+    typeof exercise.plannedWeight === 'number' &&
+    Number.isFinite(exercise.plannedWeight) &&
+    typeof latestLog.plannedWeight === 'number' &&
+    Number.isFinite(latestLog.plannedWeight)
+  ) {
+    const normalizedLogWeightUnit = normalizeWeightUnitForProgression(
+      latestLog.weightUnit,
+    )
+
+    if (
+      normalizedTargetWeightUnit &&
+      normalizedLogWeightUnit &&
+      normalizedTargetWeightUnit === normalizedLogWeightUnit
+    ) {
+      const plannedDelta = Math.abs(exercise.plannedWeight - latestLog.plannedWeight)
+      if (plannedDelta > 0.01) {
+        // Imported/manual planned-weight overrides reset progression baseline.
+        return undefined
+      }
+    }
+  }
+
+  if (
+    typeof latestLog.actualWeight === 'number' &&
+    Number.isFinite(latestLog.actualWeight)
+  ) {
+    const normalizedLogWeightUnit = normalizeWeightUnitForProgression(
+      latestLog.weightUnit,
+    )
+
+    if (!normalizedTargetWeightUnit || !normalizedLogWeightUnit) {
+      return latestLog.actualWeight
+    }
+
+    if (normalizedLogWeightUnit !== normalizedTargetWeightUnit) {
+      // Historical logs with a different unit are ignored as progression baselines.
+      return undefined
+    }
+
+    return Number(latestLog.actualWeight.toFixed(2))
   }
 
   return undefined
