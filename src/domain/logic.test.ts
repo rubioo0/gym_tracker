@@ -354,8 +354,39 @@ describe('logic helpers', () => {
       },
     )
 
-    expect(planned.maxPlannedWeight).toBe(55)
+    expect(planned.maxPlannedWeight).toBe(75)
     expect(planned.maxWeightExplanation).toContain('sessions left 14 (~7 weeks)')
+  })
+
+  it('keeps the cycle max anchored to the planned baseline when latest actual is higher', () => {
+    const planned = getPlannedExercise(
+      {
+        id: 'e1',
+        name: 'Curl',
+        sets: '4',
+        reps: '10',
+        plannedWeight: 10,
+        weightUnit: 'lbs',
+        progressionRule: {
+          type: 'weight',
+          amount: 5,
+          frequency: 1,
+          frequencyUnit: 'week',
+          basis: 'successfulTrackSessions',
+        },
+      },
+      {
+        completedSessionCount: 2,
+        successfulSessionCount: 2,
+      },
+      {
+        latestCompletedActualWeight: 15,
+      },
+    )
+
+    expect(planned.plannedWeight).toBe(15)
+    expect(planned.maxPlannedWeight).toBe(45)
+    expect(planned.maxWeightExplanation).toContain('10 lbs')
   })
 
   it('uses remaining weeks windows for max weight after partial week progress', () => {

@@ -293,6 +293,8 @@ export function getPlannedExercise(
     ? (options?.latestCompletedActualWeight as number)
     : exercise.plannedWeight
 
+  const cycleBaseWeight = exercise.plannedWeight ?? basePlannedWeight
+
   const usesPerSideLoadSchema = shouldUsePerSideLoadSchema(exercise)
 
   const basePlannedWeightPerSide =
@@ -335,10 +337,10 @@ export function getPlannedExercise(
     )
     const unitLabel = exercise.weightUnit ?? 'kg'
     const remainingWeeks = remainingSessionCount / SESSIONS_PER_WEEK
-    // Max target is dynamic for the current cycle (base + remaining windows).
-    // Do not hard-cap to rule.maxValue because imports can leave stale static values.
+    // Max target is dynamic for the current cycle (planned baseline + remaining windows).
+    // Current actual weight only affects the next planned load, not the cycle cap.
     const maxProgressedWeight = clamp(
-      basePlannedWeight + maxSteps * rule.amount,
+      cycleBaseWeight + maxSteps * rule.amount,
       rule.minValue,
       undefined,
     )
@@ -349,7 +351,7 @@ export function getPlannedExercise(
     }
 
     planned.maxWeightExplanation = buildMaxWeightExplanation(
-      basePlannedWeight,
+      cycleBaseWeight,
       unitLabel,
       rule.amount,
       rule.frequency,
