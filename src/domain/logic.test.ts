@@ -429,6 +429,7 @@ describe('logic helpers', () => {
                 frequency: 1,
                 frequencyUnit: 'week',
                 basis: 'successfulTrackSessions',
+                maxValue: 32.5,
               },
             },
           ],
@@ -512,6 +513,8 @@ describe('logic helpers', () => {
     expect(planned.exercises[0].maxPlannedWeight).toBe(30)
     expect(planned.exercises[0].maxWeightExplanation).toContain('sessions left 13 (~6.5 weeks)')
     expect(calendar.sessions[3].exercises[0].plannedWeight).toBe(15)
+    expect(calendar.sessions[11].exercises[0].plannedWeight).toBe(25)
+    expect(calendar.sessions[15].exercises[0].plannedWeight).toBe(30)
   })
 
   it('computes remaining-program max from current baseline for weekly progression', () => {

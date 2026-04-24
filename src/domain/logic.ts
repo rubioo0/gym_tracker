@@ -418,18 +418,29 @@ function projectPlannedExerciseForSessionIndex(
     return planned
   }
 
-  const currentProgressionSteps = getProgressionSteps(
-    progressionSessionCount,
-    effectiveFrequencySessions,
-  )
-  const projectedProgressionSteps = getProgressionSteps(
-    sessionIndex,
-    effectiveFrequencySessions,
-  )
-  const progressionDelta = Math.max(
-    0,
-    projectedProgressionSteps - currentProgressionSteps,
-  )
+  const hasBaselineReset =
+    options?.latestCompletedActualWeight === undefined ||
+    !Number.isFinite(options?.latestCompletedActualWeight as number)
+
+  let progressionDelta: number
+
+  if (hasBaselineReset) {
+    const sessionsFromReset = Math.max(0, sessionIndex - progressionSessionCount)
+    progressionDelta = Math.floor(sessionsFromReset / effectiveFrequencySessions)
+  } else {
+    const currentProgressionSteps = getProgressionSteps(
+      progressionSessionCount,
+      effectiveFrequencySessions,
+    )
+    const projectedProgressionSteps = getProgressionSteps(
+      sessionIndex,
+      effectiveFrequencySessions,
+    )
+    progressionDelta = Math.max(
+      0,
+      projectedProgressionSteps - currentProgressionSteps,
+    )
+  }
 
   if (progressionDelta <= 0) {
     return planned
