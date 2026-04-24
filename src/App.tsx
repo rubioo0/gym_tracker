@@ -9,7 +9,10 @@ import {
   saveAppState,
 } from './data/storage'
 import { seededProgramTemplates } from './data/seed'
-import { upsertProgramTemplateFromCsv } from './data/csvTemplateUpsert'
+import {
+  findImportedTemplateByFileName,
+  upsertProgramTemplateFromCsv,
+} from './data/csvTemplateUpsert'
 import { exportProgramTemplateToCsv } from './data/csvExport'
 import { extractCsvImportMetadata } from './data/csvImport'
 import {
@@ -116,6 +119,8 @@ function App() {
   const [dataMessage, setDataMessage] = useState('')
   const [csvRawText, setCsvRawText] = useState('')
   const [csvFileName, setCsvFileName] = useState('')
+  const [csvUploadedFileName, setCsvUploadedFileName] = useState('')
+  const [csvMetadataSourceFileName, setCsvMetadataSourceFileName] = useState('')
   const [csvProgramName, setCsvProgramName] = useState('Imported CSV Program')
   const [csvTrack, setCsvTrack] = useState<TrackType>('upper')
   const [csvMode, setCsvMode] = useState<ProgramMode>('main')
@@ -279,6 +284,31 @@ function App() {
   )
 
   const selectedRunSet = useMemo(() => new Set(selectedRunIds), [selectedRunIds])
+
+  const csvImportPreview = useMemo(() => {
+    if (!csvRawText.trim()) {
+      return null
+    }
+
+    const targetFileName = csvMetadataSourceFileName || csvUploadedFileName || csvFileName
+    const resolvedTemplate = targetFileName
+      ? findImportedTemplateByFileName(state.programTemplates, targetFileName)
+      : undefined
+
+    return {
+      targetFileName,
+      resolvedTemplate,
+      usesMetadataSource:
+        csvMetadataSourceFileName.length > 0 &&
+        csvMetadataSourceFileName !== csvUploadedFileName,
+    }
+  }, [
+    csvFileName,
+    csvMetadataSourceFileName,
+    csvRawText,
+    csvUploadedFileName,
+    state.programTemplates,
+  ])
 
   const selectedRunCount = useMemo(
     () => state.focusRuns.filter((run) => selectedRunSet.has(run.id)).length,
@@ -566,9 +596,13 @@ function App() {
       const text = await file.text()
       const metadata = extractCsvImportMetadata(text)
       const effectiveFileName = metadata.sourceFileName?.trim() || file.name
+      const uploadedFileName = file.name
+      const metadataSourceFileName = metadata.sourceFileName?.trim() ?? ''
 
       setCsvRawText(text)
       setCsvFileName(effectiveFileName)
+      setCsvUploadedFileName(uploadedFileName)
+      setCsvMetadataSourceFileName(metadataSourceFileName)
 
       if (metadata.programName) {
         setCsvProgramName(metadata.programName)
@@ -597,7 +631,9 @@ function App() {
       setDataMessage(
         metadata.templateId
           ? `Loaded CSV: ${file.name} (program metadata detected).`
-          : `Loaded CSV: ${file.name}`,
+          : metadataSourceFileName && metadataSourceFileName !== uploadedFileName
+            ? `Loaded CSV: ${file.name}. Metadata source-file-name is "${metadataSourceFileName}".`
+            : `Loaded CSV: ${file.name}`,
       )
     } catch {
       setDataMessage('Failed to read CSV file.')
@@ -614,7 +650,7 @@ function App() {
       const result = upsertProgramTemplateFromCsv({
         templates: state.programTemplates,
         csvText: csvRawText,
-        fileName: csvFileName || undefined,
+        fileName: csvUploadedFileName || csvFileName || undefined,
         programName: csvProgramName,
         mode: csvMode,
         track: csvTrack,
@@ -1521,7 +1557,31 @@ function App() {
                 <input type="file" accept=".csv,text/csv" onChange={handleCsvFileChange} />
               </label>
 
-              {csvFileName ? <p className="muted">Loaded file: {csvFileName}</p> : null}
+              {csvUploadedFileName ? (
+                <p className="muted">Uploaded file: {csvUploadedFileName}</p>
+              ) : null}
+
+              {csvMetadataSourceFileName ? (
+                <p className="muted">CSV metadata source-file-name: {csvMetadataSourceFileName}</p>
+              ) : null}
+
+              {csvImportPreview?.targetFileName ? (
+                <p className="muted">Resolved update target filename: {csvImportPreview.targetFileName}</p>
+              ) : null}
+
+              {csvImportPreview?.resolvedTemplate ? (
+                <p className="muted">
+                  Preview: will update template "{csvImportPreview.resolvedTemplate.name}" ({csvImportPreview.resolvedTemplate.track} / {csvImportPreview.resolvedTemplate.focusTarget})
+                </p>
+              ) : csvRawText.trim() ? (
+                <p className="muted">Preview: no existing template matched. Import will create a new template.</p>
+              ) : null}
+
+              {csvImportPreview?.usesMetadataSource ? (
+                <p className="note">
+                  This CSV carries source-file-name metadata, so matching uses that value instead of the uploaded file name.
+                </p>
+              ) : null}
 
               <div className="action-row">
                 <label className="inline-field">

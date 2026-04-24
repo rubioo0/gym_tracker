@@ -539,6 +539,7 @@ export function upsertProgramTemplateFromCsv(
 
   const mergedTargetSession: SessionTemplate = {
     ...sessionResolution.session,
+    note: importedSession.note ?? sessionResolution.session.note,
     exercises: mergedExercises,
   }
 

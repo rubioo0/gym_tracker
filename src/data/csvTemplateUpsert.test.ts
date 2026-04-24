@@ -318,12 +318,59 @@ describe('csv template upsert', () => {
     expect(result.diff.addedExercises).toBe(3)
     expect(result.diff.removedExercises).toBe(1)
     expect(result.diff.updatedExercises).toBe(3)
+    expect(result.template.note).toBe('CSV import source: Book 2.csv')
+    expect(result.template.sessions[0].note).toBe('Imported from Book 2.csv')
     expect(result.warnings.some((warning) => warning.includes('Hard overwrite mode'))).toBe(
       true,
     )
   })
 
-  it('preserves existing program identity when updating an imported template', () => {
+  it('refreshes source notes when updating with a different file name', () => {
+    const existingTemplate: ProgramTemplate = {
+      id: 'manual-upper-1',
+      name: 'Manual Upper',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'biceps',
+      note: 'CSV import source: biceps.csv',
+      sessions: [
+        {
+          id: 'manual-upper-1-session-1',
+          name: 'Upper A',
+          order: 1,
+          track: 'upper',
+          note: 'Imported from biceps.csv',
+          exercises: [
+            {
+              id: 'manual-upper-1-ex-legacy',
+              name: 'Legacy Curl',
+              sets: '4 sets',
+              reps: '12',
+              plannedWeight: 20,
+              weightUnit: 'kg',
+            },
+          ],
+        },
+      ],
+    }
+
+    const result = upsertProgramTemplateFromCsv({
+      templates: [existingTemplate],
+      csvText: BASE_CSV,
+      fileName: 'biceps_upd.csv',
+      hardOverwrite: true,
+    })
+
+    expect(result.status).toBe('success')
+    if (result.status !== 'success') {
+      throw new Error('Expected success result')
+    }
+
+    expect(result.template.note).toBe('CSV import source: biceps_upd.csv')
+    expect(result.template.sessions[0].note).toBe('Imported from biceps_upd.csv')
+  })
+
+  it('preserves existing program identity when CSV lacks explicit identity metadata', () => {
     const existingTemplate: ProgramTemplate = {
       id: 'manual-lower-1',
       name: 'Manual Lower',
