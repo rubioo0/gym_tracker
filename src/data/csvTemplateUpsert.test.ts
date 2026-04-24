@@ -323,6 +323,59 @@ describe('csv template upsert', () => {
     )
   })
 
+  it('preserves existing program identity when updating an imported template', () => {
+    const existingTemplate: ProgramTemplate = {
+      id: 'manual-lower-1',
+      name: 'Manual Lower',
+      mode: 'maintenance',
+      track: 'lower',
+      focusTarget: 'legs',
+      note: 'CSV import source: Book 2.csv',
+      sessions: [
+        {
+          id: 'manual-lower-1-session-1',
+          name: 'Lower A',
+          order: 1,
+          track: 'lower',
+          exercises: [
+            {
+              id: 'manual-lower-1-ex-1',
+              name: 'Squat',
+              sets: '4 sets',
+              reps: '8',
+              plannedWeight: 80,
+              weightUnit: 'kg',
+            },
+          ],
+        },
+      ],
+    }
+
+    const result = upsertProgramTemplateFromCsv({
+      templates: [existingTemplate],
+      csvText: BASE_CSV,
+      fileName: 'Book 2.csv',
+      programName: 'Updated Hands',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'arms',
+      durationWeeks: 8,
+      hardOverwrite: true,
+    })
+
+    expect(result.status).toBe('success')
+    if (result.status !== 'success') {
+      throw new Error('Expected success result')
+    }
+
+    expect(result.operation).toBe('updated')
+    expect(result.template.id).toBe(existingTemplate.id)
+    expect(result.template.mode).toBe('maintenance')
+    expect(result.template.track).toBe('lower')
+    expect(result.template.focusTarget).toBe('legs')
+    expect(result.template.name).toBe('Manual Lower')
+  })
+
   it('returns conflict when template-id and source-file-name resolve to different templates', () => {
     const templateById: ProgramTemplate = {
       id: 'template-a',
