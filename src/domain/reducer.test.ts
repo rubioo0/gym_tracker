@@ -38,6 +38,37 @@ describe('app reducer', () => {
     expect(startedAgain.focusRuns[0].status).toBe('active')
   })
 
+  it('keeps active run snapshot stable when templates are replaced', () => {
+    const started = appReducer(createInitialState(seededProgramTemplates), {
+      type: 'startRun',
+      templateId: 'main-upper-biceps',
+      now: '2026-04-08T10:00:00.000Z',
+    })
+
+    const updatedTemplates: ProgramTemplate[] = started.programTemplates.map((template) =>
+      template.id === 'main-upper-biceps'
+        ? {
+            ...template,
+            name: 'Hands Updated',
+            mode: 'travel',
+            track: 'lower',
+            focusTarget: 'hands',
+          }
+        : template,
+    )
+
+    const replaced = appReducer(started, {
+      type: 'replaceTemplates',
+      templates: updatedTemplates,
+    })
+
+    expect(getTemplateById(replaced.programTemplates, 'main-upper-biceps')?.track).toBe('lower')
+    expect(replaced.focusRuns[0].track).toBe('upper')
+    expect(replaced.focusRuns[0].mode).toBe('main')
+    expect(replaced.focusRuns[0].focusTarget).toBe('biceps')
+    expect(replaced.focusRuns[0].templateName).toBe('Hands Updated')
+  })
+
   it('logs session and advances pointer/count', () => {
     const started = appReducer(createInitialState(seededProgramTemplates), {
       type: 'startRun',

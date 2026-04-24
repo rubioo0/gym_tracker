@@ -123,9 +123,6 @@ function synchronizeRunTemplateSnapshot(
   return {
     ...run,
     templateName: template.name,
-    mode: template.mode,
-    track: template.track,
-    focusTarget: template.focusTarget,
   }
 }
 

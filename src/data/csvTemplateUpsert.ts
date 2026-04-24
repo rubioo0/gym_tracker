@@ -549,11 +549,11 @@ export function upsertProgramTemplateFromCsv(
   const mergedTemplate: ProgramTemplate = {
     id: existingTemplate.id,
     name: importedTemplate.name,
-    mode: existingTemplate.mode,
-    track: existingTemplate.track,
-    focusTarget: existingTemplate.focusTarget,
+    mode: importedTemplate.mode,
+    track: importedTemplate.track,
+    focusTarget: importedTemplate.focusTarget,
     sessions: mergedSessions,
-    note: existingTemplate.note ?? importedTemplate.note,
+    note: importedTemplate.note ?? existingTemplate.note,
   }
 
   const nextTemplates = options.templates.map((template) =>
