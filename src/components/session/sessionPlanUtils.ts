@@ -95,6 +95,14 @@ function formatDualWeightValue(value: number, unit?: string): string {
   return `${formatConvertedNumber(lbsValue)} lbs (${formatConvertedNumber(kgValue)} kg)`
 }
 
+function getDisplayPlannedWeight(exercise: PlannedExercise): number | undefined {
+  return exercise.basePlannedWeight ?? exercise.plannedWeight
+}
+
+function getDisplayPlannedWeightPerSide(exercise: PlannedExercise): number | undefined {
+  return exercise.basePlannedWeightPerSide ?? exercise.plannedWeightPerSide
+}
+
 export function formatPlannedWeightOverview(exercise: PlannedExercise): string {
   if (exercise.isBodyweightLoad) {
     if (typeof exercise.plannedWeight === 'number') {
@@ -105,13 +113,15 @@ export function formatPlannedWeightOverview(exercise: PlannedExercise): string {
     return 'body'
   }
 
-  if (typeof exercise.plannedWeightPerSide === 'number') {
-    return formatPerHandValue(exercise.plannedWeightPerSide, exercise.weightUnit)
+  const displayPlannedWeightPerSide = getDisplayPlannedWeightPerSide(exercise)
+  if (typeof displayPlannedWeightPerSide === 'number') {
+    return formatPerHandValue(displayPlannedWeightPerSide, exercise.weightUnit)
   }
 
-  if (typeof exercise.plannedWeight === 'number') {
+  const displayPlannedWeight = getDisplayPlannedWeight(exercise)
+  if (typeof displayPlannedWeight === 'number') {
     // Overview should show only the effective working load.
-    return formatWeightValue(exercise.plannedWeight, exercise.weightUnit)
+    return formatWeightValue(displayPlannedWeight, exercise.weightUnit)
   }
 
   if (exercise.plannedLoadLabel) {
@@ -142,16 +152,18 @@ export function formatPlannedWeightDetails(exercise: PlannedExercise): string {
     return 'body'
   }
 
-  if (typeof exercise.plannedWeightPerSide === 'number') {
+  const displayPlannedWeightPerSide = getDisplayPlannedWeightPerSide(exercise)
+  if (typeof displayPlannedWeightPerSide === 'number') {
     const totalWeight =
-      typeof exercise.plannedWeight === 'number'
-        ? formatDualWeightValue(exercise.plannedWeight, exercise.weightUnit)
-        : formatDualWeightValue(exercise.plannedWeightPerSide * 2, exercise.weightUnit)
+      typeof getDisplayPlannedWeight(exercise) === 'number'
+        ? formatDualWeightValue(getDisplayPlannedWeight(exercise) as number, exercise.weightUnit)
+        : formatDualWeightValue(displayPlannedWeightPerSide * 2, exercise.weightUnit)
 
-    return `${formatDualWeightValue(exercise.plannedWeightPerSide, exercise.weightUnit)} на кожну руку (total: ${totalWeight})`
+    return `${formatDualWeightValue(displayPlannedWeightPerSide, exercise.weightUnit)} на кожну руку (total: ${totalWeight})`
   }
 
-  if (typeof exercise.plannedWeight !== 'number') {
+  const displayPlannedWeight = getDisplayPlannedWeight(exercise)
+  if (typeof displayPlannedWeight !== 'number') {
     if (exercise.plannedLoadLabel) {
       return exercise.plannedLoadLabel
     }
@@ -159,7 +171,7 @@ export function formatPlannedWeightDetails(exercise: PlannedExercise): string {
     return '-'
   }
 
-  return formatDualWeightValue(exercise.plannedWeight, exercise.weightUnit)
+  return formatDualWeightValue(displayPlannedWeight, exercise.weightUnit)
 }
 
 // Backward compatibility for any existing imports.

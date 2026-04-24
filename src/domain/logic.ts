@@ -275,6 +275,8 @@ export function getPlannedExercise(
     name: exercise.name,
     sets: exercise.sets,
     reps: exercise.reps,
+    basePlannedWeight: exercise.plannedWeight,
+    basePlannedWeightPerSide: exercise.plannedWeightPerSide,
     plannedWeight: exercise.plannedWeight,
     plannedWeightPerSide: exercise.plannedWeightPerSide,
     weightUnit: exercise.weightUnit,

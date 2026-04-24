@@ -127,6 +127,8 @@ export interface PlannedExercise {
   name: string
   sets: string
   reps: string
+  basePlannedWeight?: number
+  basePlannedWeightPerSide?: number
   plannedWeight?: number
   plannedWeightPerSide?: number
   weightUnit?: string
