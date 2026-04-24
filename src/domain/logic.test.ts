@@ -355,7 +355,7 @@ describe('logic helpers', () => {
     )
 
     expect(planned.maxPlannedWeight).toBe(55)
-    expect(planned.maxWeightExplanation).toContain('sessions done 2, sessions left 14')
+    expect(planned.maxWeightExplanation).toContain('weeks left 6')
   })
 
   it('computes remaining-program max from current baseline for weekly progression', () => {
@@ -387,7 +387,34 @@ describe('logic helpers', () => {
 
     expect(planned.plannedWeight).toBe(12.5)
     expect(planned.maxPlannedWeight).toBe(27.5)
-    expect(planned.maxWeightExplanation).toContain('sessions done 2, sessions left 14')
+    expect(planned.maxWeightExplanation).toContain('weeks left 6')
+  })
+
+  it('computes remaining-program max for two-week progression using week-based steps', () => {
+    const planned = getPlannedExercise(
+      {
+        id: 'e1',
+        name: 'Curl',
+        sets: '4',
+        reps: '10',
+        plannedWeight: 45,
+        weightUnit: 'lbs',
+        progressionRule: {
+          type: 'weight',
+          amount: 10,
+          frequency: 2,
+          frequencyUnit: 'week',
+          basis: 'successfulTrackSessions',
+        },
+      },
+      {
+        completedSessionCount: 3,
+        successfulSessionCount: 3,
+      },
+    )
+
+    expect(planned.maxPlannedWeight).toBe(75)
+    expect(planned.maxWeightExplanation).toContain('weeks left 5')
   })
 
   it('uses history by exercise name when IDs changed', () => {
