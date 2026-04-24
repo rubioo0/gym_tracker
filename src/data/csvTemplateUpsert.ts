@@ -49,7 +49,7 @@ interface CsvTemplateIdentityConflictDetails {
 
 interface CsvTemplateUpsertConflictResult {
   status: 'conflict'
-  reason: 'template-identity-mismatch'
+  reason: 'template-identity-mismatch' | 'ambiguous-source-file-name'
   message: string
   details: CsvTemplateIdentityConflictDetails
 }
@@ -91,28 +91,65 @@ function extractCsvImportSourceFileName(template: ProgramTemplate): string | und
   return fileName.length > 0 ? fileName : undefined
 }
 
+function findImportedTemplatesByFileName(
+  templates: ProgramTemplate[],
+  fileName: string,
+): ProgramTemplate[] {
+  const normalizedTarget = normalizeFileName(fileName)
+  if (!normalizedTarget) {
+    return []
+  }
+
+  return templates.filter((template) => {
+    const sourceFileName = extractCsvImportSourceFileName(template)
+    if (!sourceFileName) {
+      return false
+    }
+
+    return normalizeFileName(sourceFileName) === normalizedTarget
+  })
+}
+
 export function findImportedTemplateByFileName(
   templates: ProgramTemplate[],
   fileName: string,
 ): ProgramTemplate | undefined {
-  const normalizedTarget = normalizeFileName(fileName)
-  if (!normalizedTarget) {
-    return undefined
+  const matches = findImportedTemplatesByFileName(templates, fileName)
+  return matches[matches.length - 1]
+}
+
+function resolveTemplatesByFileName(
+  templates: ProgramTemplate[],
+  fileName: string,
+  identity: {
+    mode?: ProgramMode
+    track?: TrackType
+    focusTarget?: string
+  },
+): ProgramTemplate[] {
+  const matches = findImportedTemplatesByFileName(templates, fileName)
+  if (matches.length <= 1) {
+    return matches
   }
 
-  for (let index = templates.length - 1; index >= 0; index -= 1) {
-    const template = templates[index]
-    const sourceFileName = extractCsvImportSourceFileName(template)
-    if (!sourceFileName) {
-      continue
-    }
+  let narrowed = [...matches]
 
-    if (normalizeFileName(sourceFileName) === normalizedTarget) {
-      return template
-    }
+  if (identity.mode) {
+    narrowed = narrowed.filter((template) => template.mode === identity.mode)
   }
 
-  return undefined
+  if (identity.track) {
+    narrowed = narrowed.filter((template) => template.track === identity.track)
+  }
+
+  const normalizedFocus = identity.focusTarget?.trim().toLowerCase()
+  if (normalizedFocus) {
+    narrowed = narrowed.filter(
+      (template) => template.focusTarget.trim().toLowerCase() === normalizedFocus,
+    )
+  }
+
+  return narrowed.length > 0 ? narrowed : matches
 }
 
 function extractExerciseNumber(exerciseId: string, templateId: string): string | undefined {
@@ -328,6 +365,26 @@ function createTemplateIdentityConflict(
   }
 }
 
+function createAmbiguousSourceFileConflict(
+  fileName: string,
+  providedFileName: string | undefined,
+  matchingTemplates: ProgramTemplate[],
+): CsvTemplateUpsertConflictResult {
+  return {
+    status: 'conflict',
+    reason: 'ambiguous-source-file-name',
+    message:
+      'CSV source file name matches multiple templates. Provide metadata template-id or narrow mode/track/focus before updating.',
+    details: {
+      metadataSourceFileName: fileName,
+      providedFileName,
+      resolvedTemplateIdBySourceFileName: matchingTemplates
+        .map((template) => template.id)
+        .join(', '),
+    },
+  }
+}
+
 export function upsertProgramTemplateFromCsv(
   options: CsvTemplateUpsertOptions,
 ): CsvTemplateUpsertResult {
@@ -338,13 +395,34 @@ export function upsertProgramTemplateFromCsv(
   const exportedSessionId = csvMetadata.exportedSessionId?.trim()
   const targetFileName = metadataSourceFileName || providedFileName
 
+  const identityHint = {
+    mode: csvMetadata.mode ?? options.mode,
+    track: csvMetadata.track ?? options.track,
+    focusTarget: csvMetadata.focusTarget ?? options.focusTarget?.trim(),
+  }
+
   const existingTemplateById = targetTemplateId
     ? options.templates.find((template) => template.id === targetTemplateId)
     : undefined
 
-  const existingTemplateByMetadataFileName = metadataSourceFileName
-    ? findImportedTemplateByFileName(options.templates, metadataSourceFileName)
-    : undefined
+  const metadataFileMatches = metadataSourceFileName
+    ? resolveTemplatesByFileName(options.templates, metadataSourceFileName, identityHint)
+    : []
+
+  if (
+    metadataSourceFileName &&
+    !targetTemplateId &&
+    metadataFileMatches.length > 1
+  ) {
+    return createAmbiguousSourceFileConflict(
+      metadataSourceFileName,
+      providedFileName,
+      metadataFileMatches,
+    )
+  }
+
+  const existingTemplateByMetadataFileName =
+    metadataFileMatches[metadataFileMatches.length - 1]
 
   if (
     targetTemplateId &&
@@ -362,20 +440,33 @@ export function upsertProgramTemplateFromCsv(
     )
   }
 
-  const existingTemplateByProvidedFileName =
+  const providedFileMatches =
     !metadataSourceFileName && providedFileName
-      ? findImportedTemplateByFileName(options.templates, providedFileName)
-      : undefined
+      ? resolveTemplatesByFileName(options.templates, providedFileName, identityHint)
+      : []
+
+  if (!metadataSourceFileName && providedFileName && providedFileMatches.length > 1) {
+    return createAmbiguousSourceFileConflict(
+      providedFileName,
+      providedFileName,
+      providedFileMatches,
+    )
+  }
+
+  const existingTemplateByProvidedFileName =
+    providedFileMatches[providedFileMatches.length - 1]
 
   const existingTemplate =
     existingTemplateById ??
     existingTemplateByMetadataFileName ??
     existingTemplateByProvidedFileName
 
-  const resolvedProgramName = options.programName?.trim() || csvMetadata.programName
-  const resolvedMode = options.mode ?? csvMetadata.mode
-  const resolvedTrack = options.track ?? csvMetadata.track
-  const resolvedFocusTarget = options.focusTarget?.trim() || csvMetadata.focusTarget
+  const resolvedProgramName =
+    csvMetadata.programName ?? existingTemplate?.name ?? options.programName?.trim()
+  const resolvedMode = csvMetadata.mode ?? existingTemplate?.mode ?? options.mode
+  const resolvedTrack = csvMetadata.track ?? existingTemplate?.track ?? options.track
+  const resolvedFocusTarget =
+    csvMetadata.focusTarget ?? existingTemplate?.focusTarget ?? options.focusTarget?.trim()
   const resolvedDurationWeeks = options.durationWeeks ?? csvMetadata.durationWeeks
 
   const importedTemplate = importProgramTemplateFromCsv(options.csvText, {

@@ -380,6 +380,59 @@ training-os-metadata,source-file-name,B.csv
     expect(result.details.resolvedTemplateIdBySourceFileName).toBe('template-b')
   })
 
+  it('returns conflict when source file name matches multiple templates without enough identity metadata', () => {
+    const upperTemplate: ProgramTemplate = {
+      id: 'template-upper',
+      name: 'Upper Arms',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'arms',
+      note: 'CSV import source: Shared.csv',
+      sessions: [
+        {
+          id: 'template-upper-session-1',
+          name: 'Upper',
+          order: 1,
+          track: 'upper',
+          exercises: [],
+        },
+      ],
+    }
+
+    const lowerTemplate: ProgramTemplate = {
+      id: 'template-lower',
+      name: 'Lower Legs',
+      mode: 'main',
+      track: 'lower',
+      focusTarget: 'legs',
+      note: 'CSV import source: Shared.csv',
+      sessions: [
+        {
+          id: 'template-lower-session-1',
+          name: 'Lower',
+          order: 1,
+          track: 'lower',
+          exercises: [],
+        },
+      ],
+    }
+
+    const result = upsertProgramTemplateFromCsv({
+      templates: [upperTemplate, lowerTemplate],
+      csvText: BASE_CSV,
+      fileName: 'Shared.csv',
+    })
+
+    expect(result.status).toBe('conflict')
+    if (result.status !== 'conflict') {
+      throw new Error('Expected conflict result')
+    }
+
+    expect(result.reason).toBe('ambiguous-source-file-name')
+    expect(result.details.resolvedTemplateIdBySourceFileName).toContain('template-upper')
+    expect(result.details.resolvedTemplateIdBySourceFileName).toContain('template-lower')
+  })
+
   it('is idempotent when importing the same CSV update repeatedly', () => {
     const created = upsertProgramTemplateFromCsv({
       templates: [],

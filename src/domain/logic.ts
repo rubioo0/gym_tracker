@@ -91,12 +91,18 @@ function getRemainingProgressionStepCount(
   }
 
   const sessionsLeft = Math.max(0, FIXED_PROGRAM_SESSIONS - completedSessionCount)
-  if (sessionsLeft <= 1) {
+  if (sessionsLeft <= 0) {
     return 0
   }
 
-  const rawSteps = Math.floor((sessionsLeft - 1) / effectiveFrequencySessions)
-  void hasLatestCompletedActualWeight
+  const progressionWindow = hasLatestCompletedActualWeight
+    ? Math.max(0, sessionsLeft - 1)
+    : sessionsLeft
+  if (progressionWindow <= 0) {
+    return 0
+  }
+
+  const rawSteps = Math.floor(progressionWindow / effectiveFrequencySessions)
   return rawSteps
 }
 
@@ -535,25 +541,6 @@ function calculateAvgDaysBetweenSessions(logs: WorkoutLog[]): number {
 }
 
 /**
- * Get the count of completed sessions up to a given index.
- */
-function getCompletedSessionsUpTo(
-  upToIndex: number,
-  logs: WorkoutLog[],
-  template: ProgramTemplate,
-): number {
-  let count = 0
-  for (let i = 0; i < upToIndex; i++) {
-    const sessionTemplate = getSessionByIndex(template, i)
-    const hasLog = logs.some((log) => log.sessionId === sessionTemplate.id)
-    if (hasLog) {
-      count++
-    }
-  }
-  return count
-}
-
-/**
  * Build calendar data for a training run with projected dates.
  * Shows all 16 sessions with calculated weights and completion status.
  */
@@ -562,44 +549,41 @@ export function buildProgramCalendar(
   template: ProgramTemplate,
   workoutLogs: WorkoutLog[] = [],
 ): ProgramCalendar {
-  const templateLogs = workoutLogs
-    .filter((log) => log.templateId === run.templateId)
+  const runLogs = workoutLogs
+    .filter((log) => log.runId === run.id)
     .sort((a, b) => {
       const dateA = new Date(a.completedAt).getTime()
       const dateB = new Date(b.completedAt).getTime()
       return dateA - dateB
     })
 
-  const avgDaysBetween = calculateAvgDaysBetweenSessions(templateLogs)
-
-  // Find the last logged session date
-  const lastLogDate = templateLogs.length > 0
-    ? new Date(templateLogs[templateLogs.length - 1].completedAt)
+  const avgDaysBetween = calculateAvgDaysBetweenSessions(runLogs)
+  const completedCount = runLogs.length
+  const lastLogDate = completedCount > 0
+    ? new Date(runLogs[completedCount - 1].completedAt)
     : new Date(run.startedAt)
 
-  // Build calendar sessions (0-15)
   const sessions: CalendarSession[] = []
 
   for (let sessionIndex = 0; sessionIndex < FIXED_PROGRAM_SESSIONS; sessionIndex++) {
     const sessionTemplate = getSessionByIndex(template, sessionIndex)
-    const logForSession = templateLogs.find(
-      (log) => log.sessionId === sessionTemplate.id,
-    )
+    // Use occurrence-indexed completion because session IDs repeat across cycles.
+    const logForOccurrence = runLogs[sessionIndex]
 
-    // Calculate projected date for this session
     let projectedDate: string | undefined
-    if (!logForSession) {
-      const completedSoFar = getCompletedSessionsUpTo(sessionIndex, templateLogs, template)
-      const daysSinceStart = completedSoFar * avgDaysBetween
-      const projectedDateObj = new Date(lastLogDate.getTime() + daysSinceStart * 24 * 60 * 60 * 1000)
+    if (!logForOccurrence) {
+      const futureStep = sessionIndex - completedCount + 1
+      const daysSinceLastCompletion = Math.max(1, futureStep) * avgDaysBetween
+      const projectedDateObj = new Date(
+        lastLogDate.getTime() + daysSinceLastCompletion * 24 * 60 * 60 * 1000,
+      )
       projectedDate = projectedDateObj.toISOString()
     }
 
-    // Build exercises for this session with weights
     const exercises = sessionTemplate.exercises.map((exercise) => {
-      const exerciseCounters = getExerciseProgressionCounters(templateLogs, exercise)
+      const exerciseCounters = getExerciseProgressionCounters(runLogs, exercise)
       const latestCompletedActualWeight = getLatestCompletedActualWeight(
-        templateLogs,
+        runLogs,
         exercise,
         exercise.weightUnit,
       )
@@ -608,8 +592,7 @@ export function buildProgramCalendar(
         latestCompletedActualWeight,
       })
 
-      // Get actual weight if this session was logged
-      const actualLog = logForSession?.exerciseLogs.find((log) =>
+      const actualLog = logForOccurrence?.exerciseLogs.find((log) =>
         isSameExercise(exercise, log),
       )
 
@@ -632,27 +615,21 @@ export function buildProgramCalendar(
       sessionId: sessionTemplate.id,
       sessionName: sessionTemplate.name,
       track: sessionTemplate.track,
-      loggedDate: logForSession?.completedAt,
+      loggedDate: logForOccurrence?.completedAt,
       projectedDate,
       exercises,
-      isCompleted: Boolean(logForSession),
+      isCompleted: Boolean(logForOccurrence),
     })
   }
 
-  // Calculate estimated end date
-  const lastProjectedIndex = sessions.findIndex((s) => !s.isCompleted)
-  let estimatedEndDate: string
-  if (lastProjectedIndex === -1) {
-    // All sessions completed
-    estimatedEndDate = sessions[sessions.length - 1].loggedDate || new Date().toISOString()
-  } else {
-    estimatedEndDate = sessions[lastProjectedIndex].projectedDate || new Date().toISOString()
-  }
+  const lastSession = sessions[sessions.length - 1]
+  const estimatedEndDate =
+    lastSession.loggedDate ?? lastSession.projectedDate ?? new Date().toISOString()
 
   return {
     runId: run.id,
     templateId: run.templateId,
-    startDate: run.startedAt,
+    startDate: runLogs[0]?.completedAt ?? run.startedAt,
     estimatedEndDate,
     avgDaysBetweenSessions: avgDaysBetween,
     sessions,

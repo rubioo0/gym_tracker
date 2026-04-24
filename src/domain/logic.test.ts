@@ -787,35 +787,91 @@ describe('logic helpers', () => {
 
     const calendar = buildProgramCalendar(run, template, workoutLogs)
 
-    // Should have 16 sessions
     expect(calendar.sessions).toHaveLength(16)
-
-    // First two should be logged (session-1 at index 0, session-2 at index 1)
     expect(calendar.sessions[0].sessionId).toBe('session-1')
     expect(calendar.sessions[0].isCompleted).toBe(true)
-
     expect(calendar.sessions[1].sessionId).toBe('session-2')
     expect(calendar.sessions[1].isCompleted).toBe(true)
 
-    // Session at index 2 is session-1 again (rotation), and it has a log
-    // Session at index 3 is session-2 again (rotation), and it has a log
-    // But these are different runs of the same session, so they should be projected
-    // Actually with only 2 sessions in template, all 16 indices map to 2 sessions
-    // So we have logs for indices 0,2,4,6,8,10,12,14 (session-1) and 1,3,5,7,9,11,13,15 (session-2)
-    // Both are logged! Let me just verify the calendar structure is sound
+    // Occurrence mapping: index 2+ should be projected, not auto-completed by repeated session IDs.
+    expect(calendar.sessions[2].sessionId).toBe('session-1')
+    expect(calendar.sessions[2].isCompleted).toBe(false)
+    expect(calendar.sessions[2].projectedDate).toBeDefined()
+    expect(calendar.sessions[3].sessionId).toBe('session-2')
+    expect(calendar.sessions[3].isCompleted).toBe(false)
 
-    // Calendar should have estimated end date
     expect(calendar.estimatedEndDate).toBeDefined()
-
-    // Average days should be calculated from the two logged sessions (2 days apart)
+    expect(new Date(calendar.estimatedEndDate).getTime()).toBeGreaterThan(
+      new Date(calendar.startDate).getTime(),
+    )
     expect(calendar.avgDaysBetweenSessions).toBeGreaterThan(0)
-
-    // Exercise weights should match planned values
     expect(calendar.sessions[0].exercises[0].plannedWeight).toBe(100)
     expect(calendar.sessions[1].exercises[0].plannedWeight).toBe(110)
+  })
 
-    // Verify session rotation works correctly
-    expect(calendar.sessions[2].sessionId).toBe('session-1')
-    expect(calendar.sessions[3].sessionId).toBe('session-2')
+  it('builds calendar using selected run logs only', () => {
+    const run: FocusRun = {
+      id: 'run-active',
+      templateId: 'template-1',
+      templateName: 'Upper Body',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'strength',
+      status: 'active',
+      startedAt: '2026-04-10T10:00:00.000Z',
+      completedSessionCount: 1,
+      successfulSessionCount: 1,
+      nextSessionIndex: 1,
+    }
+
+    const template: ProgramTemplate = {
+      id: 'template-1',
+      name: 'Upper Body',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'strength',
+      sessions: [
+        {
+          id: 'session-1',
+          name: 'Upper A',
+          order: 1,
+          track: 'upper',
+          exercises: [],
+        },
+      ],
+    }
+
+    const workoutLogs: WorkoutLog[] = [
+      {
+        id: 'log-active',
+        runId: 'run-active',
+        templateId: 'template-1',
+        sessionId: 'session-1',
+        sessionName: 'Upper A',
+        track: 'upper',
+        completedAt: '2026-04-10T11:00:00.000Z',
+        successful: true,
+        exerciseLogs: [],
+        optionalActivities: [],
+      },
+      {
+        id: 'log-other-run',
+        runId: 'run-old',
+        templateId: 'template-1',
+        sessionId: 'session-1',
+        sessionName: 'Upper A',
+        track: 'upper',
+        completedAt: '2026-04-01T11:00:00.000Z',
+        successful: true,
+        exerciseLogs: [],
+        optionalActivities: [],
+      },
+    ]
+
+    const calendar = buildProgramCalendar(run, template, workoutLogs)
+
+    expect(calendar.startDate).toBe('2026-04-10T11:00:00.000Z')
+    expect(calendar.sessions[0].isCompleted).toBe(true)
+    expect(calendar.sessions[1].isCompleted).toBe(false)
   })
 })

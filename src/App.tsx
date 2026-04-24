@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react'
 import {
   clearAppState,
   exportAppStateJson,
+  exportCleanAppStateJson,
   importStateFromJson,
   loadAppState,
   saveAppState,
@@ -472,6 +473,23 @@ function App() {
     window.setTimeout(() => URL.revokeObjectURL(backupUrl), 0)
 
     setDataMessage(`Backup downloaded: ${fileName}`)
+  }
+
+  function handleExportCleanState(): void {
+    const text = exportCleanAppStateJson(state)
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const fileName = `training-os-backup-clean-${timestamp}.json`
+    const backupBlob = new Blob([text], { type: 'application/json;charset=utf-8' })
+    const backupUrl = URL.createObjectURL(backupBlob)
+    const link = document.createElement('a')
+    link.href = backupUrl
+    link.download = fileName
+    link.click()
+    window.setTimeout(() => URL.revokeObjectURL(backupUrl), 0)
+
+    setDataMessage(
+      `Clean backup downloaded: ${fileName} (archived/completed runs excluded, active/paused runs only)`,
+    )
   }
 
   function handleExportCsvTemplate(template: ProgramTemplate): void {
@@ -1466,10 +1484,19 @@ function App() {
 
             <div className="template-group">
               <h3>State Backup</h3>
+              <p className="muted">
+                Use the clean backup when cache-busting or updating your app (excludes
+                archived/completed runs). Use full backup to preserve all historical data.
+              </p>
               <div className="action-row">
-                <button type="button" onClick={handleExportState}>
-                  Download Backup JSON
+                <button type="button" onClick={handleExportCleanState}>
+                  Download Clean Backup (Recommended)
                 </button>
+                <button type="button" onClick={handleExportState}>
+                  Download Full Backup
+                </button>
+              </div>
+              <div className="action-row">
                 <label className="stacked-field inline-file-field">
                   Import Backup JSON File
                   <input

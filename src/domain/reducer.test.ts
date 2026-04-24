@@ -19,6 +19,25 @@ describe('app reducer', () => {
     expect(next.focusRuns[0].templateId).toBe('main-upper-biceps')
   })
 
+  it('reuses existing non-archived run when starting the same template again', () => {
+    const state = createInitialState(seededProgramTemplates)
+    const started = appReducer(state, {
+      type: 'startRun',
+      templateId: 'main-upper-biceps',
+      now: '2026-04-08T10:00:00.000Z',
+    })
+
+    const startedAgain = appReducer(started, {
+      type: 'startRun',
+      templateId: 'main-upper-biceps',
+      now: '2026-04-09T10:00:00.000Z',
+    })
+
+    expect(startedAgain.focusRuns).toHaveLength(1)
+    expect(startedAgain.focusRuns[0].id).toBe(started.focusRuns[0].id)
+    expect(startedAgain.focusRuns[0].status).toBe('active')
+  })
+
   it('logs session and advances pointer/count', () => {
     const started = appReducer(createInitialState(seededProgramTemplates), {
       type: 'startRun',

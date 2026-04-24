@@ -111,6 +111,24 @@ function createRunFromTemplate(template: ProgramTemplate, now: string): FocusRun
   }
 }
 
+function synchronizeRunTemplateSnapshot(
+  run: FocusRun,
+  templates: ProgramTemplate[],
+): FocusRun {
+  const template = templates.find((candidate) => candidate.id === run.templateId)
+  if (!template) {
+    return run
+  }
+
+  return {
+    ...run,
+    templateName: template.name,
+    mode: template.mode,
+    track: template.track,
+    focusTarget: template.focusTarget,
+  }
+}
+
 function removeRunsAndLogs(state: AppState, runIds: Set<string>) {
   if (runIds.size === 0) {
     return {
@@ -268,9 +286,14 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     }
 
     case 'replaceTemplates': {
+      const synchronizedRuns = state.focusRuns.map((run) =>
+        synchronizeRunTemplateSnapshot(run, action.templates),
+      )
+
       return {
         ...state,
         programTemplates: action.templates,
+        focusRuns: synchronizedRuns,
       }
     }
 
@@ -286,6 +309,26 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       const template = getTemplateById(state.programTemplates, action.templateId)
       if (!template) {
         return state
+      }
+
+      const existingRun = state.focusRuns.find(
+        (run) => run.templateId === template.id && run.status !== 'archived' && run.status !== 'completed',
+      )
+
+      if (existingRun) {
+        const pausedRuns = pauseActiveRunsOnTrack(
+          state.focusRuns,
+          existingRun.track,
+          existingRun.id,
+        )
+
+        return {
+          ...state,
+          focusRuns: setRunStatus(pausedRuns, existingRun.id, 'active', {
+            pauseReason: undefined,
+          }),
+          selectedRunId: existingRun.id,
+        }
       }
 
       const newRun = createRunFromTemplate(template, action.now)

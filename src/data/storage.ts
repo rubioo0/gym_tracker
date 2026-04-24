@@ -1,5 +1,5 @@
 import { seededProgramTemplates } from './seed'
-import type { AppState, ProgramTemplate } from '../domain/types'
+import type { AppState, FocusRun, ProgramTemplate, WorkoutLog } from '../domain/types'
 
 const STORAGE_KEY = 'training-os-app-state'
 const STORAGE_VERSION = 1
@@ -37,7 +37,109 @@ function normalizeTemplateProgressionUnits(
   }))
 }
 
+function pickCanonicalRun(runs: FocusRun[]): FocusRun {
+  const activeRuns = runs.filter((run) => run.status === 'active')
+  const candidates = activeRuns.length > 0 ? activeRuns : runs
+
+  return [...candidates].sort((a, b) => {
+    const dateA = new Date(a.startedAt).getTime()
+    const dateB = new Date(b.startedAt).getTime()
+    return dateB - dateA
+  })[0]
+}
+
+function normalizeRunCounters(
+  runs: FocusRun[],
+  logs: WorkoutLog[],
+  templates: ProgramTemplate[],
+): FocusRun[] {
+  const templateById = new Map(templates.map((template) => [template.id, template]))
+
+  return runs.map((run) => {
+    const runLogs = logs.filter((log) => log.runId === run.id)
+    const completedSessionCount = runLogs.length
+    const successfulSessionCount = runLogs.filter((log) => log.successful).length
+    const template = templateById.get(run.templateId)
+    const sessionCount = template?.sessions.length ?? 0
+    const nextSessionIndex =
+      sessionCount > 0 ? completedSessionCount % sessionCount : run.nextSessionIndex
+
+    return {
+      ...run,
+      templateName: template?.name ?? run.templateName,
+      mode: template?.mode ?? run.mode,
+      track: template?.track ?? run.track,
+      focusTarget: template?.focusTarget ?? run.focusTarget,
+      completedSessionCount,
+      successfulSessionCount,
+      nextSessionIndex,
+    }
+  })
+}
+
+function mergeDuplicateTemplateRuns(
+  runs: FocusRun[],
+  logs: WorkoutLog[],
+  selectedRunId: string | null,
+): { focusRuns: FocusRun[]; workoutLogs: WorkoutLog[]; selectedRunId: string | null } {
+  const duplicateGroups = new Map<string, FocusRun[]>()
+
+  runs.forEach((run) => {
+    if (run.status === 'archived' || run.status === 'completed') {
+      return
+    }
+
+    const bucket = duplicateGroups.get(run.templateId) ?? []
+    bucket.push(run)
+    duplicateGroups.set(run.templateId, bucket)
+  })
+
+  let mergedRuns = [...runs]
+  let mergedLogs = [...logs]
+  let nextSelectedRunId = selectedRunId
+
+  duplicateGroups.forEach((groupRuns) => {
+    if (groupRuns.length <= 1) {
+      return
+    }
+
+    const canonicalRun = pickCanonicalRun(groupRuns)
+    const duplicateIds = new Set(
+      groupRuns.filter((run) => run.id !== canonicalRun.id).map((run) => run.id),
+    )
+
+    if (duplicateIds.size === 0) {
+      return
+    }
+
+    mergedLogs = mergedLogs.map((log) =>
+      duplicateIds.has(log.runId)
+        ? {
+            ...log,
+            runId: canonicalRun.id,
+          }
+        : log,
+    )
+
+    mergedRuns = mergedRuns.filter((run) => !duplicateIds.has(run.id))
+
+    if (nextSelectedRunId && duplicateIds.has(nextSelectedRunId)) {
+      nextSelectedRunId = canonicalRun.id
+    }
+  })
+
+  return {
+    focusRuns: mergedRuns,
+    workoutLogs: mergedLogs,
+    selectedRunId: nextSelectedRunId,
+  }
+}
+
 function normalizeState(state: Partial<AppState>): AppState {
+  const templates = Array.isArray(state.programTemplates)
+    ? normalizeTemplateProgressionUnits(state.programTemplates)
+    : seededProgramTemplates
+
   const focusRuns = Array.isArray(state.focusRuns)
     ? state.focusRuns.map((run) => ({
         ...run,
@@ -61,14 +163,24 @@ function normalizeState(state: Partial<AppState>): AppState {
       }))
     : []
 
-  return {
-    programTemplates: Array.isArray(state.programTemplates)
-      ? normalizeTemplateProgressionUnits(state.programTemplates)
-      : seededProgramTemplates,
+  const merged = mergeDuplicateTemplateRuns(
     focusRuns,
     workoutLogs,
+    state.selectedRunId ?? null,
+  )
+
+  const normalizedRuns = normalizeRunCounters(
+    merged.focusRuns,
+    merged.workoutLogs,
+    templates,
+  )
+
+  return {
+    programTemplates: templates,
+    focusRuns: normalizedRuns,
+    workoutLogs: merged.workoutLogs,
     lastCompletedTrack: state.lastCompletedTrack ?? null,
-    selectedRunId: state.selectedRunId ?? null,
+    selectedRunId: merged.selectedRunId,
   }
 }
 
@@ -121,6 +233,40 @@ export function exportAppStateJson(state: AppState): string {
       exportedAt: new Date().toISOString(),
       storageVersion: STORAGE_VERSION,
       state,
+    },
+    null,
+    2,
+  )
+}
+
+export function exportCleanAppStateJson(state: AppState): string {
+  const activeAndPausedRuns = state.focusRuns.filter(
+    (run) => run.status === 'active' || run.status === 'paused',
+  )
+  const activeAndPausedRunIds = new Set(activeAndPausedRuns.map((run) => run.id))
+
+  const filteredLogs = state.workoutLogs.filter((log) =>
+    activeAndPausedRunIds.has(log.runId),
+  )
+
+  const cleanState: AppState = {
+    programTemplates: state.programTemplates,
+    focusRuns: activeAndPausedRuns,
+    workoutLogs: filteredLogs,
+    lastCompletedTrack: state.lastCompletedTrack,
+    selectedRunId:
+      state.selectedRunId && activeAndPausedRunIds.has(state.selectedRunId)
+        ? state.selectedRunId
+        : null,
+  }
+
+  return JSON.stringify(
+    {
+      backupVersion: 2,
+      exportedAt: new Date().toISOString(),
+      storageVersion: STORAGE_VERSION,
+      state: cleanState,
+      filterNote: 'This is a clean backup: only active/paused runs and their logs are included. Archived/completed runs are excluded.',
     },
     null,
     2,
