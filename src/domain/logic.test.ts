@@ -874,4 +874,166 @@ describe('logic helpers', () => {
     expect(calendar.sessions[0].isCompleted).toBe(true)
     expect(calendar.sessions[1].isCompleted).toBe(false)
   })
+
+  it('projects future calendar sessions with progression-aware weights and reps', () => {
+    const run: FocusRun = {
+      id: 'run-progression',
+      templateId: 'template-progression',
+      templateName: 'Progression Test',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'strength',
+      status: 'active',
+      startedAt: '2026-04-10T10:00:00.000Z',
+      completedSessionCount: 2,
+      successfulSessionCount: 2,
+      nextSessionIndex: 2,
+    }
+
+    const template: ProgramTemplate = {
+      id: 'template-progression',
+      name: 'Progression Test',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'strength',
+      sessions: [
+        {
+          id: 'session-1',
+          name: 'Session 1',
+          order: 1,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'bench-ex',
+              name: 'Bench Press',
+              sets: '4',
+              reps: '6-8',
+              plannedWeight: 100,
+              weightUnit: 'kg',
+              progressionRule: {
+                type: 'weight',
+                amount: 5,
+                frequency: 2,
+                basis: 'successfulTrackSessions',
+              },
+            },
+            {
+              id: 'pullup-ex',
+              name: 'Pull-up',
+              sets: '3',
+              reps: '8-10',
+              progressionRule: {
+                type: 'reps',
+                amount: 1,
+                frequency: 2,
+                basis: 'successfulTrackSessions',
+              },
+            },
+          ],
+        },
+        {
+          id: 'session-2',
+          name: 'Session 2',
+          order: 2,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'bench-ex-2',
+              name: 'Bench Press',
+              sets: '4',
+              reps: '6-8',
+              plannedWeight: 100,
+              weightUnit: 'kg',
+              progressionRule: {
+                type: 'weight',
+                amount: 5,
+                frequency: 2,
+                basis: 'successfulTrackSessions',
+              },
+            },
+            {
+              id: 'pullup-ex-2',
+              name: 'Pull-up',
+              sets: '3',
+              reps: '8-10',
+              progressionRule: {
+                type: 'reps',
+                amount: 1,
+                frequency: 2,
+                basis: 'successfulTrackSessions',
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    const workoutLogs: WorkoutLog[] = [
+      {
+        id: 'log-1',
+        runId: 'run-progression',
+        templateId: 'template-progression',
+        sessionId: 'session-1',
+        sessionName: 'Session 1',
+        track: 'upper',
+        completedAt: '2026-04-10T11:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'bench-ex',
+            exerciseName: 'Bench Press',
+            completed: true,
+            skipped: false,
+            actualWeight: 100,
+            weightUnit: 'kg',
+          },
+          {
+            exerciseId: 'pullup-ex',
+            exerciseName: 'Pull-up',
+            completed: true,
+            skipped: false,
+            weightUnit: 'kg',
+          },
+        ],
+        optionalActivities: [],
+      },
+      {
+        id: 'log-2',
+        runId: 'run-progression',
+        templateId: 'template-progression',
+        sessionId: 'session-2',
+        sessionName: 'Session 2',
+        track: 'upper',
+        completedAt: '2026-04-12T11:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'bench-ex-2',
+            exerciseName: 'Bench Press',
+            completed: true,
+            skipped: false,
+            actualWeight: 100,
+            weightUnit: 'kg',
+          },
+          {
+            exerciseId: 'pullup-ex-2',
+            exerciseName: 'Pull-up',
+            completed: true,
+            skipped: false,
+            weightUnit: 'kg',
+          },
+        ],
+        optionalActivities: [],
+      },
+    ]
+
+    const calendar = buildProgramCalendar(run, template, workoutLogs)
+
+    expect(calendar.sessions[2].exercises[0].plannedWeight).toBe(100)
+    expect(calendar.sessions[3].exercises[0].plannedWeight).toBe(100)
+    expect(calendar.sessions[4].exercises[0].plannedWeight).toBe(105)
+    expect(calendar.sessions[2].exercises[1].reps).toBe('9-11')
+    expect(calendar.sessions[3].exercises[1].reps).toBe('9-11')
+    expect(calendar.sessions[4].exercises[1].reps).toBe('10-12')
+  })
 })

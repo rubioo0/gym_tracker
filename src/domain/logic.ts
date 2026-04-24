@@ -399,6 +399,75 @@ export function getPlannedExercise(
   return planned
 }
 
+function projectPlannedExerciseForSessionIndex(
+  exercise: ExerciseTemplate,
+  countersOrCompleted: number | ProgressionCounters,
+  options: PlannedExerciseOptions | undefined,
+  sessionIndex: number,
+): PlannedExercise {
+  const planned = getPlannedExercise(exercise, countersOrCompleted, options)
+  const rule = exercise.progressionRule
+
+  if (!rule) {
+    return planned
+  }
+
+  const counters = normalizeProgressionCounters(countersOrCompleted)
+  const progressionSessionCount = getProgressionSessionCount(rule, counters)
+  const effectiveFrequencySessions = getEffectiveFrequencySessions(rule)
+
+  if (effectiveFrequencySessions <= 0) {
+    return planned
+  }
+
+  const currentProgressionSteps = getProgressionSteps(
+    progressionSessionCount,
+    effectiveFrequencySessions,
+  )
+  const projectedProgressionSteps = getProgressionSteps(
+    sessionIndex,
+    effectiveFrequencySessions,
+  )
+  const progressionDelta = Math.max(
+    0,
+    projectedProgressionSteps - currentProgressionSteps,
+  )
+
+  if (progressionDelta <= 0) {
+    return planned
+  }
+
+  if (rule.type === 'weight' && typeof planned.plannedWeight === 'number') {
+    const projectedWeight = clamp(
+      planned.plannedWeight + progressionDelta * rule.amount,
+      rule.minValue,
+      rule.maxValue,
+    )
+
+    planned.plannedWeight = Number(projectedWeight.toFixed(2))
+
+    if (typeof planned.plannedWeightPerSide === 'number') {
+      const perSideIncrement = rule.amountPerSide ?? rule.amount / 2
+      planned.plannedWeightPerSide = Number(
+        (planned.plannedWeightPerSide + progressionDelta * perSideIncrement).toFixed(2),
+      )
+    }
+
+    return planned
+  }
+
+  if (rule.type === 'reps') {
+    const parsed = parseRepsRange(planned.reps)
+    if (parsed) {
+      const start = parsed.start + progressionDelta * rule.amount
+      const end = parsed.end + progressionDelta * rule.amount
+      planned.reps = start === end ? `${start}` : `${start}-${end}`
+    }
+  }
+
+  return planned
+}
+
 function getLatestCompletedActualWeight(
   runLogs: WorkoutLog[],
   exercise: ExerciseTemplate,
@@ -588,9 +657,14 @@ export function buildProgramCalendar(
         exercise.weightUnit,
       )
 
-      const plannedExercise = getPlannedExercise(exercise, exerciseCounters, {
-        latestCompletedActualWeight,
-      })
+      const plannedExercise = projectPlannedExerciseForSessionIndex(
+        exercise,
+        exerciseCounters,
+        {
+          latestCompletedActualWeight,
+        },
+        sessionIndex,
+      )
 
       const actualLog = logForOccurrence?.exerciseLogs.find((log) =>
         isSameExercise(exercise, log),
@@ -600,7 +674,7 @@ export function buildProgramCalendar(
         id: exercise.id,
         name: exercise.name,
         sets: exercise.sets,
-        reps: exercise.reps,
+        reps: plannedExercise.reps,
         plannedWeight: plannedExercise.plannedWeight,
         plannedWeightPerSide: plannedExercise.plannedWeightPerSide,
         weightUnit: exercise.weightUnit,
