@@ -93,10 +93,8 @@ function getRemainingProgressionStepCount(
     return 0
   }
 
-  // The next planned value is the baseline (one session).
-  // Progression starts after that baseline session.
-  const sessionsAfterBaseline = Math.max(0, remainingSessionCount - 1)
-  return Math.floor(sessionsAfterBaseline / effectiveFrequencySessions)
+  // Each full progression window remaining counts as one step.
+  return Math.floor(remainingSessionCount / effectiveFrequencySessions)
 }
 
 function clamp(value: number, minValue?: number, maxValue?: number): number {
@@ -500,14 +498,25 @@ function getLatestCompletedActualWeight(
     return undefined
   }
 
-  const normalizedTargetWeightUnit = normalizeWeightUnitForProgression(targetWeightUnit)
-
+  // If planned weight was overridden (e.g. import/manual edit), old logs are not
+  // a valid baseline regardless of whether weight units were persisted on the log.
   if (
     typeof exercise.plannedWeight === 'number' &&
     Number.isFinite(exercise.plannedWeight) &&
     typeof latestLog.plannedWeight === 'number' &&
-    Number.isFinite(latestLog.plannedWeight)
+    Number.isFinite(latestLog.plannedWeight) &&
+    Math.abs(exercise.plannedWeight - latestLog.plannedWeight) > 0.01
   ) {
+    return undefined
+  }
+
+  if (
+    typeof latestLog.actualWeight === 'number' &&
+    Number.isFinite(latestLog.actualWeight)
+  ) {
+    const normalizedTargetWeightUnit = normalizeWeightUnitForProgression(
+      targetWeightUnit,
+    )
     const normalizedLogWeightUnit = normalizeWeightUnitForProgression(
       latestLog.weightUnit,
     )
@@ -515,29 +524,8 @@ function getLatestCompletedActualWeight(
     if (
       normalizedTargetWeightUnit &&
       normalizedLogWeightUnit &&
-      normalizedTargetWeightUnit === normalizedLogWeightUnit
+      normalizedLogWeightUnit !== normalizedTargetWeightUnit
     ) {
-      const plannedDelta = Math.abs(exercise.plannedWeight - latestLog.plannedWeight)
-      if (plannedDelta > 0.01) {
-        // Imported/manual planned-weight overrides reset progression baseline.
-        return undefined
-      }
-    }
-  }
-
-  if (
-    typeof latestLog.actualWeight === 'number' &&
-    Number.isFinite(latestLog.actualWeight)
-  ) {
-    const normalizedLogWeightUnit = normalizeWeightUnitForProgression(
-      latestLog.weightUnit,
-    )
-
-    if (!normalizedTargetWeightUnit || !normalizedLogWeightUnit) {
-      return latestLog.actualWeight
-    }
-
-    if (normalizedLogWeightUnit !== normalizedTargetWeightUnit) {
       // Historical logs with a different unit are ignored as progression baselines.
       return undefined
     }

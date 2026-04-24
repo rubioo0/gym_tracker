@@ -542,7 +542,7 @@ describe('logic helpers', () => {
     )
 
     expect(planned.plannedWeight).toBe(12.5)
-    expect(planned.maxPlannedWeight).toBe(27.5)
+    expect(planned.maxPlannedWeight).toBe(30)
     expect(planned.maxWeightExplanation).toContain('sessions left 14 (~7 weeks)')
   })
 
