@@ -293,8 +293,6 @@ export function getPlannedExercise(
     ? (options?.latestCompletedActualWeight as number)
     : exercise.plannedWeight
 
-  const cycleBaseWeight = exercise.plannedWeight ?? basePlannedWeight
-
   const usesPerSideLoadSchema = shouldUsePerSideLoadSchema(exercise)
 
   const basePlannedWeightPerSide =
@@ -309,6 +307,7 @@ export function getPlannedExercise(
     `${rule.type} +${rule.amount} every ${rule.frequency} ${getFrequencyUnitLabel(rule, rule.frequency)} (${rule.basis === 'successfulTrackSessions' ? 'successful' : 'completed'})`
 
   if (rule.type === 'weight' && typeof basePlannedWeight === 'number') {
+    const cycleBaseWeight = (exercise.plannedWeight ?? basePlannedWeight) as number
     const progressedWeight = clamp(
       basePlannedWeight,
       rule.minValue,
