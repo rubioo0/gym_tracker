@@ -334,12 +334,13 @@ export function getPlannedExercise(
       effectiveFrequencySessions,
     )
     const unitLabel = exercise.weightUnit ?? 'kg'
-    const maxUpperBound = rule.maxValue
     const remainingWeeks = remainingSessionCount / SESSIONS_PER_WEEK
+    // Max target is dynamic for the current cycle (base + remaining windows).
+    // Do not hard-cap to rule.maxValue because imports can leave stale static values.
     const maxProgressedWeight = clamp(
       basePlannedWeight + maxSteps * rule.amount,
       rule.minValue,
-      maxUpperBound,
+      undefined,
     )
 
     planned.maxPlannedWeight = Number(maxProgressedWeight.toFixed(2))
@@ -450,7 +451,7 @@ function projectPlannedExerciseForSessionIndex(
     const projectedWeight = clamp(
       planned.plannedWeight + progressionDelta * rule.amount,
       rule.minValue,
-      rule.maxValue,
+      planned.maxPlannedWeight,
     )
 
     planned.plannedWeight = Number(projectedWeight.toFixed(2))

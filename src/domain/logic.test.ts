@@ -1222,4 +1222,130 @@ describe('logic helpers', () => {
     expect(calendar.sessions[3].exercises[1].reps).toBe('9-11')
     expect(calendar.sessions[4].exercises[1].reps).toBe('10-12')
   })
+
+  it('does not freeze projected progression at stale rule maxValue', () => {
+    const run: FocusRun = {
+      id: 'run-stale-cap',
+      templateId: 'template-stale-cap',
+      templateName: 'Stale Cap Test',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'strength',
+      status: 'active',
+      startedAt: '2026-04-10T10:00:00.000Z',
+      completedSessionCount: 3,
+      successfulSessionCount: 3,
+      nextSessionIndex: 3,
+    }
+
+    const template: ProgramTemplate = {
+      id: 'template-stale-cap',
+      name: 'Stale Cap Test',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'strength',
+      sessions: [
+        {
+          id: 'session-1',
+          name: 'Session 1',
+          order: 1,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'dips-id',
+              name: 'Бруси',
+              sets: '4',
+              reps: '10',
+              plannedWeight: 20,
+              weightUnit: 'lbs',
+              isBodyweightLoad: true,
+              progressionRule: {
+                type: 'weight',
+                amount: 2.5,
+                frequency: 1,
+                frequencyUnit: 'week',
+                basis: 'successfulTrackSessions',
+                maxValue: 32.5,
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    const workoutLogs: WorkoutLog[] = [
+      {
+        id: 'log-3',
+        runId: 'run-stale-cap',
+        templateId: 'template-stale-cap',
+        sessionId: 'session-1',
+        sessionName: 'Session 1',
+        track: 'upper',
+        completedAt: '2026-04-14T11:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'dips-id',
+            exerciseName: 'Бруси',
+            completed: true,
+            skipped: false,
+            plannedWeight: 20,
+            actualWeight: 20,
+            weightUnit: 'lbs',
+          },
+        ],
+        optionalActivities: [],
+      },
+      {
+        id: 'log-2',
+        runId: 'run-stale-cap',
+        templateId: 'template-stale-cap',
+        sessionId: 'session-1',
+        sessionName: 'Session 1',
+        track: 'upper',
+        completedAt: '2026-04-12T11:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'dips-id',
+            exerciseName: 'Бруси',
+            completed: true,
+            skipped: false,
+            plannedWeight: 20,
+            actualWeight: 20,
+            weightUnit: 'lbs',
+          },
+        ],
+        optionalActivities: [],
+      },
+      {
+        id: 'log-1',
+        runId: 'run-stale-cap',
+        templateId: 'template-stale-cap',
+        sessionId: 'session-1',
+        sessionName: 'Session 1',
+        track: 'upper',
+        completedAt: '2026-04-10T11:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'dips-id',
+            exerciseName: 'Бруси',
+            completed: true,
+            skipped: false,
+            plannedWeight: 20,
+            actualWeight: 20,
+            weightUnit: 'lbs',
+          },
+        ],
+        optionalActivities: [],
+      },
+    ]
+
+    const planned = buildPlannedSession(run, template, workoutLogs)
+    const calendar = buildProgramCalendar(run, template, workoutLogs)
+
+    expect(planned.exercises[0].maxPlannedWeight).toBe(35)
+    expect(calendar.sessions[15].exercises[0].plannedWeight).toBe(35)
+  })
 })
