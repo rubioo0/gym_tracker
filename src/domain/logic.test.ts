@@ -708,7 +708,7 @@ describe('logic helpers', () => {
     expect(plannedSession.exercises[0].sessionLeftCount).toBe(14)
   })
 
-  it('aggregates exercise history across runs of the same template', () => {
+  it('uses exercise history only from the active run', () => {
     const run: FocusRun = {
       id: 'active-run',
       templateId: 'template-1',
@@ -806,8 +806,8 @@ describe('logic helpers', () => {
 
     const plannedSession = buildPlannedSession(run, template, workoutLogs)
 
-    expect(plannedSession.exercises[0].sessionDoneCount).toBe(2)
-    expect(plannedSession.exercises[0].sessionLeftCount).toBe(14)
+    expect(plannedSession.exercises[0].sessionDoneCount).toBe(1)
+    expect(plannedSession.exercises[0].sessionLeftCount).toBe(15)
   })
 
   it('applies reps progression for numeric ranges', () => {

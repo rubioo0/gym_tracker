@@ -29,10 +29,6 @@ function normalizeTemplateProgressionUnits(
           ...exercise,
           progressionRule: {
             ...exercise.progressionRule,
-            frequencyUnit:
-              exercise.progressionRule.frequencyUnit === 'week'
-                ? 'session'
-                : exercise.progressionRule.frequencyUnit,
             maxValue: undefined,
           },
         }

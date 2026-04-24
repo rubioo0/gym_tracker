@@ -148,6 +148,52 @@ describe('storage normalization', () => {
     expect(imported).not.toBeNull()
     expect(imported?.programTemplates[0].sessions[0].exercises[0].progressionRule?.maxValue).toBeUndefined()
   })
+
+  it('preserves week frequency units on import', () => {
+    const raw = JSON.stringify({
+      programTemplates: [
+        {
+          id: 'template-1',
+          name: 'Biceps',
+          mode: 'main',
+          track: 'upper',
+          focusTarget: 'biceps',
+          sessions: [
+            {
+              id: 'session-1',
+              name: 'Session 1',
+              order: 1,
+              track: 'upper',
+              exercises: [
+                {
+                  id: 'exercise-1',
+                  name: 'Curl',
+                  sets: '4',
+                  reps: '10',
+                  plannedWeight: 20,
+                  progressionRule: {
+                    type: 'weight',
+                    amount: 2.5,
+                    frequency: 1,
+                    frequencyUnit: 'week',
+                    basis: 'successfulTrackSessions',
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      focusRuns: [],
+      workoutLogs: [],
+      lastCompletedTrack: null,
+      selectedRunId: null,
+    })
+
+    const imported = importStateFromJson(raw)
+    expect(imported).not.toBeNull()
+    expect(imported?.programTemplates[0].sessions[0].exercises[0].progressionRule?.frequencyUnit).toBe('week')
+  })
 })
 
 describe('export clean state', () => {

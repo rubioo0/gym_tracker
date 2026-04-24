@@ -583,8 +583,8 @@ export function buildPlannedSession(
   workoutLogs: WorkoutLog[] = [],
 ): PlannedSession {
   const session = getSessionByIndex(template, run.nextSessionIndex)
-  const templateLogs = workoutLogs
-    .filter((workoutLog) => workoutLog.templateId === run.templateId)
+  const runLogs = workoutLogs
+    .filter((workoutLog) => workoutLog.runId === run.id)
     .sort((a, b) => (a.completedAt < b.completedAt ? 1 : -1))
 
   return {
@@ -592,9 +592,9 @@ export function buildPlannedSession(
     template,
     session,
     exercises: session.exercises.map((exercise) => {
-      const exerciseCounters = getExerciseProgressionCounters(templateLogs, exercise)
+      const exerciseCounters = getExerciseProgressionCounters(runLogs, exercise)
       const latestCompletedActualWeight = getLatestCompletedActualWeight(
-        templateLogs,
+        runLogs,
         exercise,
         exercise.weightUnit,
       )
