@@ -82,25 +82,23 @@ function getNextHintCount(
 }
 
 function getRemainingProgressionStepCount(
-  completedSessionCount: number,
+  remainingSessionCount: number,
   effectiveFrequencySessions: number,
-  hasLatestCompletedActualWeight: boolean,
 ): number {
   if (effectiveFrequencySessions <= 0) {
     return 0
   }
 
-  const remainingWeeks = Math.max(0, FIXED_PROGRAM_WEEKS - completedSessionCount)
-  if (remainingWeeks <= 0) {
+  if (remainingSessionCount <= 0) {
     return 0
   }
 
-  const effectiveFrequencyWeeks = effectiveFrequencySessions / SESSIONS_PER_WEEK
-  const progressionWindow = hasLatestCompletedActualWeight
-    ? Math.max(0, remainingWeeks - 0)
-    : remainingWeeks
-
-  return Math.max(0, Math.ceil(progressionWindow / effectiveFrequencyWeeks))
+  // A newly configured/logged value becomes the current baseline window.
+  // We only count full progression windows after that baseline window.
+  const fullProgressionWindows = Math.floor(
+    remainingSessionCount / effectiveFrequencySessions,
+  )
+  return Math.max(0, fullProgressionWindows - 1)
 }
 
 function clamp(value: number, minValue?: number, maxValue?: number): number {
@@ -247,10 +245,11 @@ function buildMaxWeightExplanation(
   frequencyUnit: 'week' | 'session',
   steps: number,
   maxWeight: number,
+  remainingSessionCount: number,
   remainingWeeks: number,
 ): string {
   const frequencyLabel = frequency === 1 ? frequencyUnit : `${frequencyUnit}s`
-  return `${formatNumber(baseWeight)} ${unit} + (${steps} x ${formatNumber(amount)} ${unit}) every ${frequency} ${frequencyLabel}; weeks left ${remainingWeeks} = ${formatNumber(maxWeight)} ${unit}`
+  return `${formatNumber(baseWeight)} ${unit} + (${steps} x ${formatNumber(amount)} ${unit}) every ${frequency} ${frequencyLabel}; sessions left ${remainingSessionCount} (~${formatNumber(remainingWeeks)} weeks) = ${formatNumber(maxWeight)} ${unit}`
 }
 
 function shouldUsePerSideLoadSchema(exercise: ExerciseTemplate): boolean {
@@ -330,14 +329,17 @@ export function getPlannedExercise(
       planned.plannedWeight,
       progressedPerSide,
     )
+    const remainingSessionCount = Math.max(
+      0,
+      FIXED_PROGRAM_SESSIONS - progressionSessionCount,
+    )
     const maxSteps = getRemainingProgressionStepCount(
-      progressionSessionCount,
+      remainingSessionCount,
       effectiveFrequencySessions,
-      hasLatestCompletedActualWeight,
     )
     const unitLabel = exercise.weightUnit ?? 'kg'
     const maxUpperBound = rule.maxValue
-    const remainingWeeks = Math.max(0, FIXED_PROGRAM_WEEKS - progressionSessionCount)
+    const remainingWeeks = remainingSessionCount / SESSIONS_PER_WEEK
     const maxProgressedWeight = clamp(
       basePlannedWeight + maxSteps * rule.amount,
       rule.minValue,
@@ -357,6 +359,7 @@ export function getPlannedExercise(
       rule.frequencyUnit === 'week' ? 'week' : 'session',
       maxSteps,
       maxProgressedWeight,
+      remainingSessionCount,
       remainingWeeks,
     )
 
