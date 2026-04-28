@@ -21,6 +21,10 @@ interface ProgressionCounters {
 
 interface PlannedExerciseOptions {
   latestCompletedActualWeight?: number
+  baselineAnchor?: {
+    weight: number
+    resetAtSessionIndex: number
+  }
 }
 
 const FIXED_PROGRAM_WEEKS = 8
@@ -56,6 +60,14 @@ export function getProgressionSteps(
     return 0
   }
   return Math.floor(completedSessionCount / frequency)
+}
+
+function getSessionsSinceReset(
+  completedSessionCount: number,
+  resetAtSessionIndex: number,
+): number {
+  const sessionsSinceReset = Math.max(0, completedSessionCount - resetAtSessionIndex)
+  return sessionsSinceReset
 }
 
 function getEffectiveFrequencySessions(rule: ProgressionRule): number {
@@ -307,7 +319,10 @@ export function getPlannedExercise(
     `${rule.type} +${rule.amount} every ${rule.frequency} ${getFrequencyUnitLabel(rule, rule.frequency)} (${rule.basis === 'successfulTrackSessions' ? 'successful' : 'completed'})`
 
   if (rule.type === 'weight' && typeof basePlannedWeight === 'number') {
-    const cycleBaseWeight = (exercise.plannedWeight ?? basePlannedWeight) as number
+    // Use basePlannedWeight as cycle base when baseline anchor exists (weight was reset)
+    const hasBaselineAnchor = options?.baselineAnchor !== undefined
+    const cycleBaseWeight = hasBaselineAnchor ? basePlannedWeight : (exercise.plannedWeight ?? basePlannedWeight) as number
+
     const progressedWeight = clamp(
       basePlannedWeight,
       rule.minValue,
@@ -420,9 +435,12 @@ function projectPlannedExerciseForSessionIndex(
     return planned
   }
 
-  const hasBaselineReset =
-    options?.latestCompletedActualWeight === undefined ||
-    !Number.isFinite(options?.latestCompletedActualWeight as number)
+  // Check if there's a baseline anchor (explicit reset) or we're just following progression
+  const hasExplicitBaselineAnchor = options?.baselineAnchor !== undefined
+  const hasLatestActualWeight =
+    typeof options?.latestCompletedActualWeight === 'number' &&
+    Number.isFinite(options?.latestCompletedActualWeight as number)
+  const hasBaselineReset = !hasLatestActualWeight && !hasExplicitBaselineAnchor
 
   let progressionDelta: number
 
@@ -430,18 +448,21 @@ function projectPlannedExerciseForSessionIndex(
     const sessionsFromReset = Math.max(0, sessionIndex - progressionSessionCount)
     progressionDelta = Math.floor(sessionsFromReset / effectiveFrequencySessions)
   } else {
+    // When there's a baseline anchor or latest actual weight, calculate delta from reset point
+    const resetPoint = hasExplicitBaselineAnchor
+      ? options.baselineAnchor!.resetAtSessionIndex
+      : 0
+    const sessionsFromReset = Math.max(0, sessionIndex - resetPoint)
+    const currentSessionsSinceReset = Math.max(0, progressionSessionCount - resetPoint)
     const currentProgressionSteps = getProgressionSteps(
-      progressionSessionCount,
+      currentSessionsSinceReset,
       effectiveFrequencySessions,
     )
     const projectedProgressionSteps = getProgressionSteps(
-      sessionIndex,
+      sessionsFromReset,
       effectiveFrequencySessions,
     )
-    progressionDelta = Math.max(
-      0,
-      projectedProgressionSteps - currentProgressionSteps,
-    )
+    progressionDelta = Math.max(0, projectedProgressionSteps - currentProgressionSteps)
   }
 
   if (progressionDelta <= 0) {
@@ -599,11 +620,13 @@ export function buildPlannedSession(
         exercise.weightUnit,
       )
 
+      const baselineAnchor = run.baselineAnchors?.[exercise.id]
       const plannedExercise = getPlannedExercise(
         exercise,
         exerciseCounters,
         {
           latestCompletedActualWeight,
+          baselineAnchor,
         },
       )
 
@@ -612,6 +635,7 @@ export function buildPlannedSession(
         exerciseCounters,
         {
           latestCompletedActualWeight,
+          baselineAnchor,
         },
         FIXED_PROGRAM_SESSIONS - 1,
       )

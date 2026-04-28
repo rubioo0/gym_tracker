@@ -72,6 +72,12 @@ export interface ProgramTemplate {
   note?: string
 }
 
+export interface BaselineAnchor {
+  weight: number
+  resetAtSessionIndex: number
+  resetAt: string // ISO timestamp
+}
+
 export interface FocusRun {
   id: string
   templateId: string
@@ -86,6 +92,7 @@ export interface FocusRun {
   nextSessionIndex: number
   notes?: string
   pauseReason?: string
+  baselineAnchors?: Record<string, BaselineAnchor> // exerciseId -> BaselineAnchor
 }
 
 export interface ExerciseLog {

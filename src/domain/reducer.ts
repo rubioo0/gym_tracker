@@ -251,6 +251,30 @@ function logSession(state: AppState, payload: LogSessionInput): AppState {
     sessionNote: payload.sessionNote,
   }
 
+  // Check for weight mismatches and record baseline anchors
+  const newBaselineAnchors = { ...run.baselineAnchors }
+  for (const exercise of plannedSession.exercises) {
+    const exerciseInput = inputByExerciseId.get(exercise.id)
+    const actualWeight = exerciseInput?.actualWeight
+    const plannedWeight = exercise.plannedWeight
+
+    // Record baseline anchor if actual weight differs from planned and is a valid weight
+    if (
+      typeof actualWeight === 'number' &&
+      Number.isFinite(actualWeight) &&
+      typeof plannedWeight === 'number' &&
+      Number.isFinite(plannedWeight) &&
+      Math.abs(actualWeight - plannedWeight) > 0.01 &&
+      !exerciseInput?.skipped
+    ) {
+      newBaselineAnchors[exercise.id] = {
+        weight: actualWeight,
+        resetAtSessionIndex: run.completedSessionCount,
+        resetAt: payload.completedAt,
+      }
+    }
+  }
+
   const sessionCount = template.sessions.length
   const nextRuns = state.focusRuns.map((candidate) => {
     if (candidate.id !== run.id) {
@@ -263,6 +287,7 @@ function logSession(state: AppState, payload: LogSessionInput): AppState {
       successfulSessionCount:
         candidate.successfulSessionCount + (payload.successful ?? true ? 1 : 0),
       nextSessionIndex: (candidate.nextSessionIndex + 1) % sessionCount,
+      baselineAnchors: newBaselineAnchors,
     }
   })
 
