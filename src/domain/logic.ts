@@ -319,19 +319,47 @@ export function getPlannedExercise(
     `${rule.type} +${rule.amount} every ${rule.frequency} ${getFrequencyUnitLabel(rule, rule.frequency)} (${rule.basis === 'successfulTrackSessions' ? 'successful' : 'completed'})`
 
   if (rule.type === 'weight' && typeof basePlannedWeight === 'number') {
-    // Use basePlannedWeight as cycle base when baseline anchor exists (weight was reset)
+    // Determine anchor point for progression:
+    // - If baseline anchor exists (deviation happened): use anchor weight + steps since reset
+    // - If latest actual weight is known (no deviation): use template base + steps from 0
+    // - If no actual weight data (fresh start or template re-import): use template base from current point
     const hasBaselineAnchor = options?.baselineAnchor !== undefined
-    const cycleBaseWeight = hasBaselineAnchor ? basePlannedWeight : (exercise.plannedWeight ?? basePlannedWeight) as number
+
+    let anchorWeight: number
+    let anchorSession: number
+
+    if (hasBaselineAnchor) {
+      // Deviation was recorded — restart progression from anchor
+      anchorWeight = options!.baselineAnchor!.weight
+      anchorSession = options!.baselineAnchor!.resetAtSessionIndex
+    } else if (hasLatestCompletedActualWeight) {
+      // Normal flow — logs exist, no deviation. Compute from template base.
+      anchorWeight = exercise.plannedWeight as number
+      anchorSession = 0
+    } else {
+      // No log data (fresh start or template re-imported with new base).
+      // Start from the template's current planned weight without applying past steps.
+      anchorWeight = exercise.plannedWeight as number
+      anchorSession = progressionSessionCount
+    }
+
+    const sessionsSinceAnchor = getSessionsSinceReset(progressionSessionCount, anchorSession)
+    const steps = getProgressionSteps(sessionsSinceAnchor, effectiveFrequencySessions)
 
     const progressedWeight = clamp(
-      basePlannedWeight,
+      anchorWeight + steps * rule.amount,
       rule.minValue,
       undefined,
     )
 
+    const usesPerSideSchema = shouldUsePerSideLoadSchema(exercise)
     let progressedPerSide: number | undefined
-    if (typeof basePlannedWeightPerSide === 'number') {
-      progressedPerSide = Number(basePlannedWeightPerSide.toFixed(2))
+    if (usesPerSideSchema) {
+      const perSideIncrement = rule.amountPerSide ?? rule.amount / 2
+      const anchorPerSide = hasBaselineAnchor
+        ? anchorWeight / 2
+        : (exercise.plannedWeightPerSide ?? anchorWeight / 2)
+      progressedPerSide = Number((anchorPerSide + steps * perSideIncrement).toFixed(2))
     }
 
     planned.plannedWeight = Number(progressedWeight.toFixed(2))
@@ -341,6 +369,7 @@ export function getPlannedExercise(
       planned.plannedWeight,
       progressedPerSide,
     )
+
     const remainingSessionCount = Math.max(
       0,
       FIXED_PROGRAM_SESSIONS - progressionSessionCount,
@@ -351,21 +380,22 @@ export function getPlannedExercise(
     )
     const unitLabel = exercise.weightUnit ?? 'kg'
     const remainingWeeks = remainingSessionCount / SESSIONS_PER_WEEK
-    // Max target is dynamic for the current cycle (planned baseline + remaining windows).
-    // Current actual weight only affects the next planned load, not the cycle cap.
     const maxProgressedWeight = clamp(
-      cycleBaseWeight + maxSteps * rule.amount,
+      progressedWeight + maxSteps * rule.amount,
       rule.minValue,
       undefined,
     )
 
     planned.maxPlannedWeight = Number(maxProgressedWeight.toFixed(2))
-    if (typeof basePlannedWeightPerSide === 'number') {
-      planned.maxPlannedWeightPerSide = Number((maxProgressedWeight / 2).toFixed(2))
+    if (usesPerSideSchema && typeof progressedPerSide === 'number') {
+      const maxPerSideIncrement = rule.amountPerSide ?? rule.amount / 2
+      planned.maxPlannedWeightPerSide = Number(
+        (progressedPerSide + maxSteps * maxPerSideIncrement).toFixed(2),
+      )
     }
 
     planned.maxWeightExplanation = buildMaxWeightExplanation(
-      cycleBaseWeight,
+      progressedWeight,
       unitLabel,
       rule.amount,
       rule.frequency,
@@ -376,11 +406,12 @@ export function getPlannedExercise(
       remainingWeeks,
     )
 
+    // Compute next target hint relative to anchor
     planned.nextTargetHint =
       effectiveFrequencySessions > 0
         ? (() => {
             const sessionsUntilNext = getSessionsUntilNext(
-              progressionSessionCount,
+              sessionsSinceAnchor,
               effectiveFrequencySessions,
             )
             const hintCount = getNextHintCount(rule, sessionsUntilNext)
@@ -435,35 +466,27 @@ function projectPlannedExerciseForSessionIndex(
     return planned
   }
 
-  // Check if there's a baseline anchor (explicit reset) or we're just following progression
+  // Determine anchor session using the same logic as getPlannedExercise
   const hasExplicitBaselineAnchor = options?.baselineAnchor !== undefined
   const hasLatestActualWeight =
     typeof options?.latestCompletedActualWeight === 'number' &&
     Number.isFinite(options?.latestCompletedActualWeight as number)
-  const hasBaselineReset = !hasLatestActualWeight && !hasExplicitBaselineAnchor
 
-  let progressionDelta: number
-
-  if (hasBaselineReset) {
-    const sessionsFromReset = Math.max(0, sessionIndex - progressionSessionCount)
-    progressionDelta = Math.floor(sessionsFromReset / effectiveFrequencySessions)
+  let anchorSession: number
+  if (hasExplicitBaselineAnchor) {
+    anchorSession = options!.baselineAnchor!.resetAtSessionIndex
+  } else if (hasLatestActualWeight) {
+    anchorSession = 0
   } else {
-    // When there's a baseline anchor or latest actual weight, calculate delta from reset point
-    const resetPoint = hasExplicitBaselineAnchor
-      ? options.baselineAnchor!.resetAtSessionIndex
-      : 0
-    const sessionsFromReset = getSessionsSinceReset(sessionIndex, resetPoint)
-    const currentSessionsSinceReset = getSessionsSinceReset(progressionSessionCount, resetPoint)
-    const currentProgressionSteps = getProgressionSteps(
-      currentSessionsSinceReset,
-      effectiveFrequencySessions,
-    )
-    const projectedProgressionSteps = getProgressionSteps(
-      sessionsFromReset,
-      effectiveFrequencySessions,
-    )
-    progressionDelta = Math.max(0, projectedProgressionSteps - currentProgressionSteps)
+    anchorSession = progressionSessionCount
   }
+
+  // Compute delta: additional steps between current and projected session
+  const currentSessionsSinceAnchor = getSessionsSinceReset(progressionSessionCount, anchorSession)
+  const projectedSessionsSinceAnchor = getSessionsSinceReset(sessionIndex, anchorSession)
+  const currentSteps = getProgressionSteps(currentSessionsSinceAnchor, effectiveFrequencySessions)
+  const projectedSteps = getProgressionSteps(projectedSessionsSinceAnchor, effectiveFrequencySessions)
+  const progressionDelta = Math.max(0, projectedSteps - currentSteps)
 
   if (progressionDelta <= 0) {
     return planned
@@ -473,7 +496,7 @@ function projectPlannedExerciseForSessionIndex(
     const projectedWeight = clamp(
       planned.plannedWeight + progressionDelta * rule.amount,
       rule.minValue,
-      planned.maxPlannedWeight,
+      undefined,
     )
 
     planned.plannedWeight = Number(projectedWeight.toFixed(2))

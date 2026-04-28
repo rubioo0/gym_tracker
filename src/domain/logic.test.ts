@@ -55,7 +55,7 @@ describe('logic helpers', () => {
     )
 
     expect(planned.plannedWeight).toBe(20)
-    expect(planned.nextTargetHint).toContain('1 session')
+    expect(planned.nextTargetHint).toContain('2 session')
   })
 
   it('uses latest logged actual weight as baseline for next planned load', () => {
@@ -71,6 +71,13 @@ describe('logic helpers', () => {
       completedSessionCount: 1,
       successfulSessionCount: 1,
       nextSessionIndex: 0,
+      baselineAnchors: {
+        'exercise-dips': {
+          weight: 0,
+          resetAtSessionIndex: 0,
+          resetAt: '2026-04-10T11:00:00.000Z',
+        },
+      },
     }
 
     const template: ProgramTemplate = {
@@ -384,9 +391,12 @@ describe('logic helpers', () => {
       },
     )
 
+    // With template base 10, 2 successful sessions, freq 2 (weekly=2 sessions):
+    // steps = floor(2/2) = 1, planned = 10 + 5 = 15
     expect(planned.plannedWeight).toBe(15)
-    expect(planned.maxPlannedWeight).toBe(45)
-    expect(planned.maxWeightExplanation).toContain('10 lbs')
+    // max = 15 + floor(14/2)*5 = 15 + 35 = 50
+    expect(planned.maxPlannedWeight).toBe(50)
+    expect(planned.maxWeightExplanation).toContain('15 lbs')
   })
 
   it('uses remaining weeks windows for max weight after partial week progress', () => {
@@ -575,8 +585,11 @@ describe('logic helpers', () => {
       },
     )
 
-    expect(planned.plannedWeight).toBe(12.5)
-    expect(planned.maxPlannedWeight).toBe(30)
+    // Template base 12.5, 2 successful sessions, freq 1 week = 2 sessions:
+    // steps = floor(2/2) = 1, planned = 12.5 + 2.5 = 15
+    expect(planned.plannedWeight).toBe(15)
+    // max = 15 + floor(14/2)*2.5 = 15 + 17.5 = 32.5
+    expect(planned.maxPlannedWeight).toBe(32.5)
     expect(planned.maxWeightExplanation).toContain('sessions left 14 (~7 weeks)')
   })
 
@@ -1246,9 +1259,13 @@ describe('logic helpers', () => {
 
     const calendar = buildProgramCalendar(run, template, workoutLogs)
 
-    expect(calendar.sessions[2].exercises[0].plannedWeight).toBe(100)
-    expect(calendar.sessions[3].exercises[0].plannedWeight).toBe(100)
-    expect(calendar.sessions[4].exercises[0].plannedWeight).toBe(105)
+    // With 2 completed sessions and freq=2, current step = floor(2/2) = 1 → weight = 105
+    // Session 2 (projected): same step as current → 105
+    // Session 3: step = floor(3/2) = 1 → 105
+    // Session 4: step = floor(4/2) = 2 → 110
+    expect(calendar.sessions[2].exercises[0].plannedWeight).toBe(105)
+    expect(calendar.sessions[3].exercises[0].plannedWeight).toBe(105)
+    expect(calendar.sessions[4].exercises[0].plannedWeight).toBe(110)
     expect(calendar.sessions[2].exercises[1].reps).toBe('9-11')
     expect(calendar.sessions[3].exercises[1].reps).toBe('9-11')
     expect(calendar.sessions[4].exercises[1].reps).toBe('10-12')
@@ -1376,7 +1393,161 @@ describe('logic helpers', () => {
     const planned = buildPlannedSession(run, template, workoutLogs)
     const calendar = buildProgramCalendar(run, template, workoutLogs)
 
-    expect(planned.exercises[0].maxPlannedWeight).toBe(35)
-    expect(calendar.sessions[15].exercises[0].plannedWeight).toBe(35)
+    // Template base 20, 3 completed (successful), freq 1 week = 2 sessions
+    // steps from 0 = floor(3/2) = 1, current = 20 + 2.5 = 22.5
+    // remaining = 13, maxSteps = floor(13/2) = 6, max = 22.5 + 6*2.5 = 37.5
+    expect(planned.exercises[0].maxPlannedWeight).toBe(37.5)
+    // Session 15: steps from 0 = floor(15/2) = 7, weight = 20 + 7*2.5 = 37.5
+    expect(calendar.sessions[15].exercises[0].plannedWeight).toBe(37.5)
+  })
+
+  // ============================================================
+  // Progression anchor reset scenarios
+  // ============================================================
+
+  it('linear progression: weight increases every N sessions as planned', () => {
+    // Setup: base 10kg, +5kg every 2 sessions
+    const exercise = {
+      id: 'e1',
+      name: 'Curl',
+      sets: '4',
+      reps: '10',
+      plannedWeight: 10,
+      weightUnit: 'kg',
+      progressionRule: {
+        type: 'weight' as const,
+        amount: 5,
+        frequency: 2,
+        basis: 'trackSessions' as const,
+      },
+    }
+
+    // Session 0: steps=floor(0/2)=0, weight=10
+    const s0 = getPlannedExercise(exercise, 0)
+    expect(s0.plannedWeight).toBe(10)
+
+    // Session 1: steps=floor(1/2)=0, weight=10
+    const s1 = getPlannedExercise(exercise, 1, { latestCompletedActualWeight: 10 })
+    expect(s1.plannedWeight).toBe(10)
+
+    // Session 2: steps=floor(2/2)=1, weight=15
+    const s2 = getPlannedExercise(exercise, 2, { latestCompletedActualWeight: 10 })
+    expect(s2.plannedWeight).toBe(15)
+
+    // Session 3: steps=floor(3/2)=1, weight=15
+    const s3 = getPlannedExercise(exercise, 3, { latestCompletedActualWeight: 15 })
+    expect(s3.plannedWeight).toBe(15)
+
+    // Session 4: steps=floor(4/2)=2, weight=20
+    const s4 = getPlannedExercise(exercise, 4, { latestCompletedActualWeight: 15 })
+    expect(s4.plannedWeight).toBe(20)
+
+    // Session 5: steps=floor(5/2)=2, weight=20
+    const s5 = getPlannedExercise(exercise, 5, { latestCompletedActualWeight: 20 })
+    expect(s5.plannedWeight).toBe(20)
+  })
+
+  it('did less than planned: anchor resets to performed value and cycle restarts', () => {
+    // Setup: base 10kg, +5kg every 2 sessions
+    // At session 4 (planned 20), user did only 15.
+    // Expected: anchor resets to 15 at session 4.
+    // Session 5,6 = 15 (cycle restart), then 7,8 = 20, etc.
+    const exercise = {
+      id: 'e1',
+      name: 'Curl',
+      sets: '4',
+      reps: '10',
+      plannedWeight: 10,
+      weightUnit: 'kg',
+      progressionRule: {
+        type: 'weight' as const,
+        amount: 5,
+        frequency: 2,
+        basis: 'trackSessions' as const,
+      },
+    }
+
+    // Session 4 was planned as 20, user did 15 → anchor created
+    const anchor = { weight: 15, resetAtSessionIndex: 4 }
+
+    // Session 5: sessionsSince=5-4=1, steps=floor(1/2)=0, weight=15
+    const s5 = getPlannedExercise(exercise, 5, {
+      latestCompletedActualWeight: 15,
+      baselineAnchor: anchor,
+    })
+    expect(s5.plannedWeight).toBe(15)
+
+    // Session 6: sessionsSince=6-4=2, steps=floor(2/2)=1, weight=15+5=20
+    const s6 = getPlannedExercise(exercise, 6, {
+      latestCompletedActualWeight: 15,
+      baselineAnchor: anchor,
+    })
+    expect(s6.plannedWeight).toBe(20)
+
+    // Session 7: sessionsSince=7-4=3, steps=floor(3/2)=1, weight=20
+    const s7 = getPlannedExercise(exercise, 7, {
+      latestCompletedActualWeight: 20,
+      baselineAnchor: anchor,
+    })
+    expect(s7.plannedWeight).toBe(20)
+
+    // Session 8: sessionsSince=8-4=4, steps=floor(4/2)=2, weight=15+10=25
+    const s8 = getPlannedExercise(exercise, 8, {
+      latestCompletedActualWeight: 20,
+      baselineAnchor: anchor,
+    })
+    expect(s8.plannedWeight).toBe(25)
+  })
+
+  it('did more than planned: anchor resets to higher performed value and cycle restarts', () => {
+    // Setup: base 10kg, +5kg every 2 sessions
+    // At session 2 (planned 15), user did 20.
+    // Expected: anchor resets to 20 at session 2.
+    // Session 3,4 = 20 (cycle restart), then 5,6 = 25, etc.
+    const exercise = {
+      id: 'e1',
+      name: 'Curl',
+      sets: '4',
+      reps: '10',
+      plannedWeight: 10,
+      weightUnit: 'kg',
+      progressionRule: {
+        type: 'weight' as const,
+        amount: 5,
+        frequency: 2,
+        basis: 'trackSessions' as const,
+      },
+    }
+
+    // Session 2 was planned as 15, user did 20 → anchor created
+    const anchor = { weight: 20, resetAtSessionIndex: 2 }
+
+    // Session 3: sessionsSince=3-2=1, steps=floor(1/2)=0, weight=20
+    const s3 = getPlannedExercise(exercise, 3, {
+      latestCompletedActualWeight: 20,
+      baselineAnchor: anchor,
+    })
+    expect(s3.plannedWeight).toBe(20)
+
+    // Session 4: sessionsSince=4-2=2, steps=floor(2/2)=1, weight=20+5=25
+    const s4 = getPlannedExercise(exercise, 4, {
+      latestCompletedActualWeight: 20,
+      baselineAnchor: anchor,
+    })
+    expect(s4.plannedWeight).toBe(25)
+
+    // Session 5: sessionsSince=5-2=3, steps=floor(3/2)=1, weight=25
+    const s5 = getPlannedExercise(exercise, 5, {
+      latestCompletedActualWeight: 25,
+      baselineAnchor: anchor,
+    })
+    expect(s5.plannedWeight).toBe(25)
+
+    // Session 6: sessionsSince=6-2=4, steps=floor(4/2)=2, weight=20+10=30
+    const s6 = getPlannedExercise(exercise, 6, {
+      latestCompletedActualWeight: 25,
+      baselineAnchor: anchor,
+    })
+    expect(s6.plannedWeight).toBe(30)
   })
 })
