@@ -305,7 +305,7 @@ export function getPlannedExercise(
     ? (options?.latestCompletedActualWeight as number)
     : exercise.plannedWeight
 
-  const usesPerSideLoadSchema = shouldUsePerSideLoadSchema(exercise)
+
 
   planned.progressionNote =
     rule.note ??
