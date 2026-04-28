@@ -452,8 +452,8 @@ function projectPlannedExerciseForSessionIndex(
     const resetPoint = hasExplicitBaselineAnchor
       ? options.baselineAnchor!.resetAtSessionIndex
       : 0
-    const sessionsFromReset = Math.max(0, sessionIndex - resetPoint)
-    const currentSessionsSinceReset = Math.max(0, progressionSessionCount - resetPoint)
+    const sessionsFromReset = getSessionsSinceReset(sessionIndex, resetPoint)
+    const currentSessionsSinceReset = getSessionsSinceReset(progressionSessionCount, resetPoint)
     const currentProgressionSteps = getProgressionSteps(
       currentSessionsSinceReset,
       effectiveFrequencySessions,
