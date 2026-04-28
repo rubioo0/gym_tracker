@@ -307,13 +307,6 @@ export function getPlannedExercise(
 
   const usesPerSideLoadSchema = shouldUsePerSideLoadSchema(exercise)
 
-  const basePlannedWeightPerSide =
-    usesPerSideLoadSchema && hasLatestCompletedActualWeight
-      ? Number(((options?.latestCompletedActualWeight as number) / 2).toFixed(2))
-      : usesPerSideLoadSchema
-        ? exercise.plannedWeightPerSide
-        : undefined
-
   planned.progressionNote =
     rule.note ??
     `${rule.type} +${rule.amount} every ${rule.frequency} ${getFrequencyUnitLabel(rule, rule.frequency)} (${rule.basis === 'successfulTrackSessions' ? 'successful' : 'completed'})`
