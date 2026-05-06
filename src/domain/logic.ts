@@ -755,6 +755,16 @@ export function buildPlannedSession(
         plannedExercise.maxPlannedWeightPerSide =
           projectedLastSessionExercise.plannedWeightPerSide
       }
+      if (
+        plannedExercise.maxWeightExplanation &&
+        typeof plannedExercise.maxPlannedWeight === 'number'
+      ) {
+        const maxUnit = exercise.weightUnit ?? 'kg'
+        plannedExercise.maxWeightExplanation = plannedExercise.maxWeightExplanation.replace(
+          /=\s*[-+]?\d*\.?\d+\s*[a-zA-Z]+\s*$/,
+          `= ${formatNumber(plannedExercise.maxPlannedWeight)} ${maxUnit}`,
+        )
+      }
 
       plannedExercise.sessionDoneCount = exerciseCounters.completedSessionCount
       plannedExercise.sessionLeftCount = Math.max(

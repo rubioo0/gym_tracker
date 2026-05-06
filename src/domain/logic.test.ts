@@ -1950,5 +1950,7 @@ describe('logic helpers', () => {
     expect(nextCalendarSession.sessionId).toBe(planned.session.id)
     expect(plannedExercise?.plannedWeight).toBe(42.5)
     expect(calendarExercise?.plannedWeight).toBe(plannedExercise?.plannedWeight)
+    expect(plannedExercise?.maxPlannedWeight).toBe(55)
+    expect(plannedExercise?.maxWeightExplanation).toContain('= 55 kg')
   })
 })
