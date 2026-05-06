@@ -16,6 +16,10 @@ import {
 import { exportProgramTemplateToCsv } from './data/csvExport'
 import { extractCsvImportMetadata } from './data/csvImport'
 import { exportWorkoutLogsToExcel, buildExcelLogFileName } from './data/excelLogExport'
+import {
+  buildExcelCalendarFileName,
+  exportProgramCalendarToExcel,
+} from './data/excelCalendarExport'
 import { importWorkoutLogsFromExcel } from './data/excelLogImport'
 import {
   buildPlannedSession,
@@ -530,6 +534,41 @@ function App() {
       const message =
         error instanceof Error ? error.message : 'Unknown export error.'
       setDataMessage(`Excel export failed: ${message}`)
+    }
+  }
+
+  function handleExportCalendarExcel(): void {
+    if (!programCalendar) {
+      setDataMessage('No calendar to export.')
+      return
+    }
+
+    try {
+      const buffer = exportProgramCalendarToExcel(programCalendar)
+      const fileName = buildExcelCalendarFileName()
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      link.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 0)
+
+      const sessionCount = programCalendar.sessions.length
+      const rowCount = programCalendar.sessions.reduce(
+        (total, session) => total + Math.max(1, session.exercises.length),
+        0,
+      )
+
+      setDataMessage(
+        `Exported calendar (${sessionCount} sessions, ${rowCount} rows) to ${fileName}`,
+      )
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown export error.'
+      setDataMessage(`Calendar export failed: ${message}`)
     }
   }
 
@@ -1600,7 +1639,14 @@ function App() {
         </section>
       )}
 
-      {activeTab === 'calendar' && <ProgramCalendarView calendar={programCalendar} />}
+      {activeTab === 'calendar' && (
+        <ProgramCalendarView
+          calendar={programCalendar}
+          onExportExcel={handleExportCalendarExcel}
+          exportDisabled={!programCalendar}
+          exportMessage={dataMessage}
+        />
+      )}
 
       {activeTab === 'data' && (
         <section className="panel-grid">

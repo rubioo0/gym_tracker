@@ -28,7 +28,6 @@ export type AppAction =
   | { type: 'deleteRuns'; runIds: string[] }
   | { type: 'setSelectedRun'; runId: string | null }
   | { type: 'logSession'; payload: LogSessionInput }
-  | { type: 'importLogs'; logs: WorkoutLog[] }
   | { type: 'clearAllData'; templates: ProgramTemplate[] }
 
 function canTransition(from: RunStatus, to: RunStatus): boolean {
@@ -486,34 +485,6 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'logSession': {
       return logSession(state, action.payload)
-    }
-
-    case 'importLogs': {
-      const importedLogs = action.logs
-
-      // Recalculate run counters from the imported logs
-      const recalculatedRuns = state.focusRuns.map((run) => {
-        const runLogs = importedLogs.filter((log) => log.runId === run.id)
-        const completedSessionCount = runLogs.length
-        const successfulSessionCount = runLogs.filter((log) => log.successful).length
-        const template = getTemplateById(state.programTemplates, run.templateId)
-        const sessionCount = template?.sessions.length ?? 0
-        const nextSessionIndex =
-          sessionCount > 0 ? completedSessionCount % sessionCount : run.nextSessionIndex
-
-        return {
-          ...run,
-          completedSessionCount,
-          successfulSessionCount,
-          nextSessionIndex,
-        }
-      })
-
-      return {
-        ...state,
-        focusRuns: recalculatedRuns,
-        workoutLogs: importedLogs,
-      }
     }
 
     case 'clearAllData': {

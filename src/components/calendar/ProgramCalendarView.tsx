@@ -4,6 +4,9 @@ import './ProgramCalendarView.css'
 
 interface ProgramCalendarViewProps {
   calendar: ProgramCalendar | null
+  onExportExcel?: () => void
+  exportDisabled?: boolean
+  exportMessage?: string
 }
 
 function formatDate(iso: string): string {
@@ -29,7 +32,12 @@ function formatPerSideWeight(weight?: number, unit?: string): string {
   return `${weight.toFixed(1)}/side ${unit ?? 'kg'}`.trim()
 }
 
-export function ProgramCalendarView({ calendar }: ProgramCalendarViewProps) {
+export function ProgramCalendarView({
+  calendar,
+  onExportExcel,
+  exportDisabled,
+  exportMessage,
+}: ProgramCalendarViewProps) {
   const [expandedSessions, setExpandedSessions] = useState<Set<number>>(new Set())
 
   if (!calendar) {
@@ -57,6 +65,16 @@ export function ProgramCalendarView({ calendar }: ProgramCalendarViewProps) {
     <section className="panel-grid">
       <article className="card card-wide">
         <h2>Календар Прогресу</h2>
+
+        {onExportExcel ? (
+          <div className="action-row">
+            <button type="button" onClick={onExportExcel} disabled={exportDisabled}>
+              Export Calendar to Excel
+            </button>
+          </div>
+        ) : null}
+
+        {exportMessage ? <p className="note">{exportMessage}</p> : null}
 
         <div className="calendar-header">
           <div className="calendar-header-stat">
