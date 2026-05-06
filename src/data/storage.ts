@@ -211,6 +211,10 @@ function normalizeState(state: Partial<AppState>): AppState {
     workoutLogs: merged.workoutLogs,
     lastCompletedTrack: state.lastCompletedTrack ?? null,
     selectedRunId: merged.selectedRunId,
+    showProgressionInsights:
+      typeof state.showProgressionInsights === 'boolean'
+        ? state.showProgressionInsights
+        : false,
   }
 }
 
@@ -223,6 +227,7 @@ export function createInitialState(
     workoutLogs: [],
     lastCompletedTrack: null,
     selectedRunId: null,
+    showProgressionInsights: false,
   }
 }
 
@@ -293,6 +298,7 @@ export function exportCleanAppStateJson(state: AppState): string {
       state.selectedRunId && activeAndPausedRunIds.has(state.selectedRunId)
         ? state.selectedRunId
         : null,
+    showProgressionInsights: state.showProgressionInsights,
   }
 
   return JSON.stringify(

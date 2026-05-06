@@ -38,6 +38,16 @@ describe('app reducer', () => {
     expect(startedAgain.focusRuns[0].status).toBe('active')
   })
 
+  it('updates progression insights visibility flag', () => {
+    const state = createInitialState(seededProgramTemplates)
+    const next = appReducer(state, {
+      type: 'setShowProgressionInsights',
+      show: true,
+    })
+
+    expect(next.showProgressionInsights).toBe(true)
+  })
+
   it('keeps active run snapshot stable when templates are replaced', () => {
     const started = appReducer(createInitialState(seededProgramTemplates), {
       type: 'startRun',
@@ -435,6 +445,7 @@ describe('app reducer', () => {
       ],
       lastCompletedTrack: null,
       selectedRunId: null,
+      showProgressionInsights: false,
     }
 
     const imported = importStateFromJson(JSON.stringify({ state: rawState }))

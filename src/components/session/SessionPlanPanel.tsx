@@ -8,8 +8,10 @@ interface SessionPlanPanelProps {
   activeRuns: FocusRun[]
   selectedRun: FocusRun | null
   hasManualRunOverride: boolean
+  showProgressionInsights: boolean
   onSelectRun: (runId: string) => void
   onResetToSuggestedRun: () => void
+  onToggleProgressionInsights: (show: boolean) => void
 }
 
 export function SessionPlanPanel({
@@ -17,8 +19,10 @@ export function SessionPlanPanel({
   activeRuns,
   selectedRun,
   hasManualRunOverride,
+  showProgressionInsights,
   onSelectRun,
   onResetToSuggestedRun,
+  onToggleProgressionInsights,
 }: SessionPlanPanelProps) {
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null)
   const [detailsExerciseId, setDetailsExerciseId] = useState<string | null>(null)
@@ -110,6 +114,15 @@ export function SessionPlanPanel({
               Use Suggested Alternation
             </button>
           ) : null}
+
+          <label className="inline-field">
+            Show progression insights
+            <input
+              type="checkbox"
+              checked={showProgressionInsights}
+              onChange={(event) => onToggleProgressionInsights(event.target.checked)}
+            />
+          </label>
         </div>
       ) : null}
 
@@ -137,6 +150,7 @@ export function SessionPlanPanel({
             exercises={plannedSession.exercises}
             selectedExerciseId={effectiveSelectedExerciseId}
             onOpenExercise={handleOpenExercise}
+            showProgressionInsights={showProgressionInsights}
           />
 
           {(plannedSession.session.optionalActivities?.length ?? 0) > 0 ? (
@@ -165,6 +179,7 @@ export function SessionPlanPanel({
       <SessionExerciseDetailsModal
         exercise={detailsExercise}
         exerciseOrder={detailsExerciseOrder}
+        showProgressionInsights={showProgressionInsights}
         onClose={handleCloseDetailsModal}
       />
     </>

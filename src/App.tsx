@@ -1247,11 +1247,15 @@ function App() {
               activeRuns={activeRuns}
               selectedRun={selectedRun}
               hasManualRunOverride={hasManualRunOverride}
+              showProgressionInsights={state.showProgressionInsights}
               onSelectRun={(runId) => {
                 dispatch({ type: 'setSelectedRun', runId })
               }}
               onResetToSuggestedRun={() => {
                 dispatch({ type: 'setSelectedRun', runId: null })
+              }}
+              onToggleProgressionInsights={(show) => {
+                dispatch({ type: 'setShowProgressionInsights', show })
               }}
             />
           </article>

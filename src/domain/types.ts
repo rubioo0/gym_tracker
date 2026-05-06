@@ -148,6 +148,9 @@ export interface PlannedExercise {
   maxPlannedWeight?: number
   maxPlannedWeightPerSide?: number
   maxWeightExplanation?: string
+  progressionValueSource?: 'template' | 'latestActual' | 'baselineAnchor'
+  progressionCycleStatus?: ProgressionCycleStatus
+  recentExerciseHistory?: ExerciseProgressHistoryEntry[]
   note?: string
   reference?: ExerciseReference
 }
@@ -170,6 +173,29 @@ export interface CalendarSessionExercise {
   actualWeight?: number
   completed?: boolean
   skipped?: boolean
+  progressionCycleStatus?: ProgressionCycleStatus
+}
+
+export interface ProgressionCycleStatus {
+  basis: ProgressionBasis
+  effectiveFrequencySessions: number
+  sessionsSinceAnchor: number
+  completedInCurrentValueWindow: number
+  plannedWindowSize: number
+  displayNumerator: number
+  displayDenominator: number
+  isHeldBeyondPlannedWindow: boolean
+  anchorWeight?: number
+  currentPlannedWeight?: number
+}
+
+export interface ExerciseProgressHistoryEntry {
+  completedAt: string
+  actualWeight?: number
+  plannedWeight?: number
+  weightUnit?: string
+  successful: boolean
+  skipped: boolean
 }
 
 export interface CalendarSession {
@@ -198,6 +224,7 @@ export interface AppState {
   workoutLogs: WorkoutLog[]
   lastCompletedTrack: TrackType | null
   selectedRunId: string | null
+  showProgressionInsights: boolean
 }
 
 export interface LogExerciseInput {

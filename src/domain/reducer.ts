@@ -28,6 +28,7 @@ export type AppAction =
   | { type: 'deleteRun'; runId: string }
   | { type: 'deleteRuns'; runIds: string[] }
   | { type: 'setSelectedRun'; runId: string | null }
+  | { type: 'setShowProgressionInsights'; show: boolean }
   | { type: 'logSession'; payload: LogSessionInput }
   | { type: 'importLogs'; logs: WorkoutLog[] }
   | { type: 'clearAllData'; templates: ProgramTemplate[] }
@@ -529,6 +530,13 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       }
     }
 
+    case 'setShowProgressionInsights': {
+      return {
+        ...state,
+        showProgressionInsights: action.show,
+      }
+    }
+
     case 'logSession': {
       return logSession(state, action.payload)
     }
@@ -556,6 +564,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         workoutLogs: [],
         lastCompletedTrack: null,
         selectedRunId: null,
+        showProgressionInsights: false,
       }
     }
 

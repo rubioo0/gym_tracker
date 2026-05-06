@@ -1,10 +1,12 @@
 import type {
   AppState,
   BaselineAnchor,
+  ExerciseProgressHistoryEntry,
   ExerciseTemplate,
   ExerciseLog,
   FocusRun,
   ProgressionRule,
+  ProgressionCycleStatus,
   PlannedExercise,
   PlannedSession,
   ProgramTemplate,
@@ -28,10 +30,17 @@ interface PlannedExerciseOptions {
   }
 }
 
+interface ProgressionAnchorContext {
+  anchorSession: number
+  anchorWeight?: number
+  valueSource: 'template' | 'latestActual' | 'baselineAnchor'
+}
+
 const FIXED_PROGRAM_WEEKS = 8
 const FIXED_PROGRAM_SESSIONS = 16
 const SESSIONS_PER_WEEK = FIXED_PROGRAM_SESSIONS / FIXED_PROGRAM_WEEKS
 const PROGRESSION_WEIGHT_TOLERANCE = 0.01
+const PROGRESSION_CYCLE_WEIGHT_TOLERANCE = 0.01
 
 export function makeId(): string {
   return crypto.randomUUID()
@@ -253,6 +262,175 @@ function getProgressionSessionCount(
   return counters.completedSessionCount
 }
 
+function resolveProgressionAnchorContext(
+  exercise: ExerciseTemplate,
+  progressionSessionCount: number,
+  options: PlannedExerciseOptions | undefined,
+): ProgressionAnchorContext {
+  const hasBaselineAnchor = options?.baselineAnchor !== undefined
+  const hasLatestCompletedActualWeight =
+    typeof options?.latestCompletedActualWeight === 'number' &&
+    Number.isFinite(options.latestCompletedActualWeight)
+
+  if (hasBaselineAnchor) {
+    return {
+      anchorWeight: options!.baselineAnchor!.weight,
+      anchorSession: options!.baselineAnchor!.resetAtSessionIndex + 1,
+      valueSource: 'baselineAnchor',
+    }
+  }
+
+  if (hasLatestCompletedActualWeight) {
+    return {
+      anchorWeight: exercise.plannedWeight,
+      anchorSession: 0,
+      valueSource: 'latestActual',
+    }
+  }
+
+  return {
+    anchorWeight: exercise.plannedWeight,
+    anchorSession: progressionSessionCount,
+    valueSource: 'template',
+  }
+}
+
+function getPerformedWeightFromLog(log: ExerciseLog): number | undefined {
+  if (typeof log.actualWeight === 'number' && Number.isFinite(log.actualWeight)) {
+    return log.actualWeight
+  }
+  if (typeof log.plannedWeight === 'number' && Number.isFinite(log.plannedWeight)) {
+    return log.plannedWeight
+  }
+  return undefined
+}
+
+function countHeldCycleExtensions(
+  runLogs: WorkoutLog[],
+  exercise: ExerciseTemplate,
+  currentPlannedWeight: number,
+  plannedWindowSize: number,
+  targetWeightUnit: string | undefined,
+): number {
+  if (plannedWindowSize <= 0) {
+    return 0
+  }
+
+  const relevantLogs = [...runLogs].sort((a, b) => {
+    const timeA = new Date(a.completedAt).getTime()
+    const timeB = new Date(b.completedAt).getTime()
+    return timeA - timeB
+  })
+
+  let consecutiveTargetCount = 0
+  for (let index = relevantLogs.length - 1; index >= 0; index -= 1) {
+    const runLog = relevantLogs[index]
+    const exerciseLog = runLog.exerciseLogs.find((candidate) =>
+      isSameExercise(exercise, candidate),
+    )
+    if (!exerciseLog || !exerciseLog.completed || exerciseLog.skipped) {
+      continue
+    }
+
+    const normalizedTargetWeightUnit = normalizeWeightUnitForProgression(targetWeightUnit)
+    const normalizedLogWeightUnit = normalizeWeightUnitForProgression(exerciseLog.weightUnit)
+    if (
+      normalizedTargetWeightUnit &&
+      normalizedLogWeightUnit &&
+      normalizedTargetWeightUnit !== normalizedLogWeightUnit
+    ) {
+      break
+    }
+
+    const performedWeight = getPerformedWeightFromLog(exerciseLog)
+    if (typeof performedWeight !== 'number') {
+      break
+    }
+
+    if (
+      Math.abs(performedWeight - currentPlannedWeight) <=
+      PROGRESSION_CYCLE_WEIGHT_TOLERANCE
+    ) {
+      consecutiveTargetCount += 1
+      continue
+    }
+
+    break
+  }
+
+  if (consecutiveTargetCount <= plannedWindowSize) {
+    return 0
+  }
+
+  const extraSessions = consecutiveTargetCount - plannedWindowSize
+  return Math.max(1, Math.ceil(extraSessions / plannedWindowSize))
+}
+
+function buildProgressionCycleStatus(
+  rule: ProgressionRule | undefined,
+  exercise: ExerciseTemplate,
+  runLogs: WorkoutLog[] | undefined,
+  counters: ProgressionCounters,
+  options: PlannedExerciseOptions | undefined,
+  currentPlannedWeight: number | undefined,
+  targetProgressionSessionCount: number,
+): ProgressionCycleStatus | undefined {
+  if (!rule) {
+    return undefined
+  }
+
+  const effectiveFrequencySessions = getEffectiveFrequencySessions(rule)
+  if (effectiveFrequencySessions <= 0) {
+    return undefined
+  }
+
+  const progressionSessionCount = getProgressionSessionCount(rule, counters)
+  const anchorContext = resolveProgressionAnchorContext(
+    exercise,
+    progressionSessionCount,
+    options,
+  )
+
+  const sessionsSinceAnchor = getSessionsSinceReset(
+    targetProgressionSessionCount,
+    anchorContext.anchorSession,
+  )
+  const plannedWindowSize = effectiveFrequencySessions
+  const completedInCurrentValueWindow = (sessionsSinceAnchor % plannedWindowSize) + 1
+  let displayDenominator = plannedWindowSize
+  const displayNumerator = Math.min(completedInCurrentValueWindow, plannedWindowSize)
+
+  let heldExtensions = 0
+  if (
+    rule.type === 'weight' &&
+    typeof currentPlannedWeight === 'number' &&
+    Array.isArray(runLogs) &&
+    runLogs.length > 0
+  ) {
+    heldExtensions = countHeldCycleExtensions(
+      runLogs,
+      exercise,
+      currentPlannedWeight,
+      plannedWindowSize,
+      exercise.weightUnit,
+    )
+    displayDenominator = plannedWindowSize * (heldExtensions + 1)
+  }
+
+  return {
+    basis: rule.basis,
+    effectiveFrequencySessions,
+    sessionsSinceAnchor,
+    completedInCurrentValueWindow,
+    plannedWindowSize,
+    displayNumerator,
+    displayDenominator,
+    isHeldBeyondPlannedWindow: heldExtensions > 0,
+    anchorWeight: anchorContext.anchorWeight,
+    currentPlannedWeight,
+  }
+}
+
 function getFrequencyUnitLabel(rule: ProgressionRule, count: number): string {
   const base = rule.frequencyUnit === 'week' ? 'week' : 'session'
   return count === 1 ? base : `${base}s`
@@ -310,10 +488,15 @@ export function getPlannedExercise(
   const counters = normalizeProgressionCounters(countersOrCompleted)
   const progressionSessionCount = getProgressionSessionCount(rule, counters)
   const effectiveFrequencySessions = getEffectiveFrequencySessions(rule)
+  const anchorContext = resolveProgressionAnchorContext(
+    exercise,
+    progressionSessionCount,
+    options,
+  )
+
   const hasLatestCompletedActualWeight =
     typeof options?.latestCompletedActualWeight === 'number' &&
     Number.isFinite(options.latestCompletedActualWeight)
-
   const basePlannedWeight = hasLatestCompletedActualWeight
     ? (options?.latestCompletedActualWeight as number)
     : exercise.plannedWeight
@@ -325,29 +508,9 @@ export function getPlannedExercise(
     `${rule.type} +${rule.amount} every ${rule.frequency} ${getFrequencyUnitLabel(rule, rule.frequency)} (${rule.basis === 'successfulTrackSessions' ? 'successful' : 'completed'})`
 
   if (rule.type === 'weight' && typeof basePlannedWeight === 'number') {
-    // Determine anchor point for progression:
-    // - If baseline anchor exists (deviation happened): use anchor weight + steps since reset
-    // - If latest actual weight is known (no deviation): use template base + steps from 0
-    // - If no actual weight data (fresh start or template re-import): use template base from current point
-    const hasBaselineAnchor = options?.baselineAnchor !== undefined
-
-    let anchorWeight: number
-    let anchorSession: number
-
-    if (hasBaselineAnchor) {
-      // Deviation was recorded — restart progression after the anchor session
-      anchorWeight = options!.baselineAnchor!.weight
-      anchorSession = options!.baselineAnchor!.resetAtSessionIndex + 1
-    } else if (hasLatestCompletedActualWeight) {
-      // Normal flow — logs exist, no deviation. Compute from template base.
-      anchorWeight = exercise.plannedWeight as number
-      anchorSession = 0
-    } else {
-      // No log data (fresh start or template re-imported with new base).
-      // Start from the template's current planned weight without applying past steps.
-      anchorWeight = exercise.plannedWeight as number
-      anchorSession = progressionSessionCount
-    }
+    const hasBaselineAnchor = anchorContext.valueSource === 'baselineAnchor'
+    const anchorWeight = anchorContext.anchorWeight as number
+    const anchorSession = anchorContext.anchorSession
 
     const sessionsSinceAnchor = getSessionsSinceReset(
       progressionSessionCount,
@@ -373,6 +536,7 @@ export function getPlannedExercise(
 
     planned.plannedWeight = Number(progressedWeight.toFixed(2))
     planned.plannedWeightPerSide = progressedPerSide
+    planned.progressionValueSource = anchorContext.valueSource
     planned.plannedLoadLabel = buildPlannedLoadLabel(
       exercise,
       planned.plannedWeight,
@@ -459,6 +623,7 @@ function projectPlannedExerciseForSessionIndex(
   countersOrCompleted: number | ProgressionCounters,
   options: PlannedExerciseOptions | undefined,
   sessionIndex: number,
+  runLogs?: WorkoutLog[],
 ): PlannedExercise {
   const planned = getPlannedExercise(exercise, countersOrCompleted, options)
   const rule = exercise.progressionRule
@@ -475,20 +640,12 @@ function projectPlannedExerciseForSessionIndex(
     return planned
   }
 
-  // Determine anchor session using the same logic as getPlannedExercise
-  const hasExplicitBaselineAnchor = options?.baselineAnchor !== undefined
-  const hasLatestActualWeight =
-    typeof options?.latestCompletedActualWeight === 'number' &&
-    Number.isFinite(options?.latestCompletedActualWeight as number)
-
-  let anchorSession: number
-  if (hasExplicitBaselineAnchor) {
-    anchorSession = options!.baselineAnchor!.resetAtSessionIndex + 1
-  } else if (hasLatestActualWeight) {
-    anchorSession = 0
-  } else {
-    anchorSession = progressionSessionCount
-  }
+  const anchorContext = resolveProgressionAnchorContext(
+    exercise,
+    progressionSessionCount,
+    options,
+  )
+  const anchorSession = anchorContext.anchorSession
 
   // Compute delta: additional steps between current and projected session
   const currentSessionsSinceAnchor = getSessionsSinceReset(
@@ -504,42 +661,48 @@ function projectPlannedExerciseForSessionIndex(
   const projectedSteps = getProgressionSteps(projectedSessionsSinceAnchor, effectiveFrequencySessions)
   const progressionDelta = Math.max(0, projectedSteps - currentSteps)
 
-  if (progressionDelta <= 0) {
-    return planned
-  }
+  if (progressionDelta > 0) {
+    if (rule.type === 'weight' && typeof planned.plannedWeight === 'number') {
+      const projectedWeight = clamp(
+        planned.plannedWeight + progressionDelta * rule.amount,
+        rule.minValue,
+        undefined,
+      )
 
-  if (rule.type === 'weight' && typeof planned.plannedWeight === 'number') {
-    const projectedWeight = clamp(
-      planned.plannedWeight + progressionDelta * rule.amount,
-      rule.minValue,
-      undefined,
-    )
+      planned.plannedWeight = Number(projectedWeight.toFixed(2))
 
-    planned.plannedWeight = Number(projectedWeight.toFixed(2))
-
-    if (typeof planned.plannedWeightPerSide === 'number') {
-      const perSideIncrement = rule.amountPerSide ?? rule.amount / 2
-      planned.plannedWeightPerSide = Number(
-        (planned.plannedWeightPerSide + progressionDelta * perSideIncrement).toFixed(2),
+      if (typeof planned.plannedWeightPerSide === 'number') {
+        const perSideIncrement = rule.amountPerSide ?? rule.amount / 2
+        planned.plannedWeightPerSide = Number(
+          (planned.plannedWeightPerSide + progressionDelta * perSideIncrement).toFixed(2),
+        )
+      }
+      planned.plannedLoadLabel = buildPlannedLoadLabel(
+        exercise,
+        planned.plannedWeight,
+        planned.plannedWeightPerSide,
       )
     }
-    planned.plannedLoadLabel = buildPlannedLoadLabel(
-      exercise,
-      planned.plannedWeight,
-      planned.plannedWeightPerSide,
-    )
 
-    return planned
-  }
-
-  if (rule.type === 'reps') {
-    const parsed = parseRepsRange(planned.reps)
-    if (parsed) {
-      const start = parsed.start + progressionDelta * rule.amount
-      const end = parsed.end + progressionDelta * rule.amount
-      planned.reps = start === end ? `${start}` : `${start}-${end}`
+    if (rule.type === 'reps') {
+      const parsed = parseRepsRange(planned.reps)
+      if (parsed) {
+        const start = parsed.start + progressionDelta * rule.amount
+        const end = parsed.end + progressionDelta * rule.amount
+        planned.reps = start === end ? `${start}` : `${start}-${end}`
+      }
     }
   }
+
+  planned.progressionCycleStatus = buildProgressionCycleStatus(
+    rule,
+    exercise,
+    runLogs,
+    counters,
+    options,
+    planned.plannedWeight,
+    sessionIndex,
+  )
 
   return planned
 }
@@ -628,6 +791,43 @@ function getExerciseProgressionCounters(
     completedSessionCount,
     successfulSessionCount,
   }
+}
+
+function getRecentExerciseHistory(
+  runLogs: WorkoutLog[],
+  exercise: ExerciseTemplate,
+  limit = 3,
+): ExerciseProgressHistoryEntry[] {
+  const sortedLogs = [...runLogs].sort((a, b) => {
+    const dateA = new Date(a.completedAt).getTime()
+    const dateB = new Date(b.completedAt).getTime()
+    return dateB - dateA
+  })
+
+  const history: ExerciseProgressHistoryEntry[] = []
+  for (const runLog of sortedLogs) {
+    const exerciseLog = runLog.exerciseLogs.find((candidate) =>
+      isSameExercise(exercise, candidate),
+    )
+    if (!exerciseLog) {
+      continue
+    }
+
+    history.push({
+      completedAt: runLog.completedAt,
+      actualWeight: exerciseLog.actualWeight,
+      plannedWeight: exerciseLog.plannedWeight,
+      weightUnit: exerciseLog.weightUnit,
+      successful: runLog.successful,
+      skipped: exerciseLog.skipped,
+    })
+
+    if (history.length >= limit) {
+      break
+    }
+  }
+
+  return history
 }
 
 export function buildBaselineAnchorsForRun(
@@ -735,6 +935,7 @@ export function buildPlannedSession(
           baselineAnchor,
         },
         nextProgramSessionIndex,
+        runLogs,
       )
 
       const projectedLastSessionExercise = projectPlannedExerciseForSessionIndex(
@@ -745,6 +946,7 @@ export function buildPlannedSession(
           baselineAnchor,
         },
         FIXED_PROGRAM_SESSIONS - 1,
+        runLogs,
       )
 
       if (typeof projectedLastSessionExercise.plannedWeight === 'number') {
@@ -770,6 +972,11 @@ export function buildPlannedSession(
       plannedExercise.sessionLeftCount = Math.max(
         0,
         FIXED_PROGRAM_SESSIONS - exerciseCounters.completedSessionCount,
+      )
+      plannedExercise.recentExerciseHistory = getRecentExerciseHistory(
+        runLogs,
+        exercise,
+        3,
       )
 
       return plannedExercise
@@ -866,6 +1073,7 @@ export function buildProgramCalendar(
           baselineAnchor,
         },
         sessionIndex,
+        runLogs,
       )
 
       const actualLog = logForOccurrence?.exerciseLogs.find((log) =>
@@ -883,6 +1091,7 @@ export function buildProgramCalendar(
         actualWeight: actualLog?.actualWeight,
         completed: actualLog?.completed ?? false,
         skipped: actualLog?.skipped ?? false,
+        progressionCycleStatus: plannedExercise.progressionCycleStatus,
       }
     })
 

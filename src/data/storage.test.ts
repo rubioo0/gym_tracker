@@ -142,6 +142,7 @@ describe('storage normalization', () => {
       workoutLogs: [],
       lastCompletedTrack: null,
       selectedRunId: null,
+      showProgressionInsights: false,
     })
 
     const imported = importStateFromJson(raw)
@@ -193,6 +194,20 @@ describe('storage normalization', () => {
     const imported = importStateFromJson(raw)
     expect(imported).not.toBeNull()
     expect(imported?.programTemplates[0].sessions[0].exercises[0].progressionRule?.frequencyUnit).toBe('week')
+  })
+
+  it('defaults progression insights toggle to false for legacy imported state', () => {
+    const raw = JSON.stringify({
+      programTemplates: [],
+      focusRuns: [],
+      workoutLogs: [],
+      lastCompletedTrack: null,
+      selectedRunId: null,
+    })
+
+    const imported = importStateFromJson(raw)
+    expect(imported).not.toBeNull()
+    expect(imported?.showProgressionInsights).toBe(false)
   })
 })
 
@@ -315,6 +330,7 @@ describe('export clean state', () => {
       ],
       lastCompletedTrack: 'upper' as const,
       selectedRunId: 'run-active',
+      showProgressionInsights: false,
     }
 
     const exported = exportCleanAppStateJson(state)
@@ -389,6 +405,7 @@ describe('export clean state', () => {
       ],
       lastCompletedTrack: 'upper' as const,
       selectedRunId: 'run-completed',
+      showProgressionInsights: true,
     }
 
     const exported = exportCleanAppStateJson(state)
@@ -436,6 +453,7 @@ describe('export clean state', () => {
       workoutLogs: [],
       lastCompletedTrack: null,
       selectedRunId: null,
+      showProgressionInsights: false,
     }
 
     const exported = JSON.parse(exportAppStateJson(state as any))

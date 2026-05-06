@@ -1,4 +1,4 @@
-import type { PlannedExercise } from '../../domain/types'
+import type { ExerciseProgressHistoryEntry, PlannedExercise } from '../../domain/types'
 
 export type ExerciseCategory =
   | 'pull'
@@ -177,6 +177,48 @@ export function formatPlannedWeightDetails(exercise: PlannedExercise): string {
 // Backward compatibility for any existing imports.
 export function formatPlannedWeight(exercise: PlannedExercise): string {
   return formatPlannedWeightDetails(exercise)
+}
+
+export function formatProgressionCycle(exercise: PlannedExercise): string | null {
+  const status = exercise.progressionCycleStatus
+  if (!status) {
+    return null
+  }
+
+  const base = `${status.displayNumerator}/${status.displayDenominator}`
+  return status.isHeldBeyondPlannedWindow ? `${base} (held)` : base
+}
+
+export function formatProgressionSource(exercise: PlannedExercise): string | null {
+  switch (exercise.progressionValueSource) {
+    case 'latestActual':
+      return 'latest actual'
+    case 'baselineAnchor':
+      return 'anchored progression'
+    case 'template':
+      return 'template baseline'
+    default:
+      return null
+  }
+}
+
+function formatHistoryWeight(weight: number | undefined, unit: string | undefined): string {
+  if (typeof weight !== 'number') {
+    return '-'
+  }
+  return `${formatWeightNumber(weight)} ${unit ?? ''}`.trim()
+}
+
+export function formatExerciseHistoryEntry(
+  entry: ExerciseProgressHistoryEntry,
+): string {
+  const dateLabel = new Date(entry.completedAt).toLocaleDateString()
+  const actualLabel = formatHistoryWeight(entry.actualWeight, entry.weightUnit)
+  if (entry.skipped) {
+    return `${dateLabel}: skipped`
+  }
+
+  return `${dateLabel}: ${actualLabel}`
 }
 
 function cleanPathSegment(value: string): string {

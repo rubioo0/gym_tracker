@@ -1,8 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { PlannedExercise } from '../../domain/types'
 import {
+  formatExerciseHistoryEntry,
   formatPlannedMaxWeightOverview,
   formatPlannedWeightDetails,
+  formatProgressionCycle,
+  formatProgressionSource,
   getEmbeddableVideoUrl,
   isDirectPlayableVideoUrl,
 } from './sessionPlanUtils'
@@ -10,12 +13,14 @@ import {
 interface SessionExerciseDetailsModalProps {
   exercise: PlannedExercise | null
   exerciseOrder: number | null
+  showProgressionInsights: boolean
   onClose: () => void
 }
 
 export function SessionExerciseDetailsModal({
   exercise,
   exerciseOrder,
+  showProgressionInsights,
   onClose,
 }: SessionExerciseDetailsModalProps) {
   const titleId = useId()
@@ -28,6 +33,8 @@ export function SessionExerciseDetailsModal({
   const embeddableVideoUrl = getEmbeddableVideoUrl(videoUrl)
   const hasDirectPlayableVideo = isDirectPlayableVideoUrl(videoUrl)
   const isDirectVideoBroken = !!videoUrl && brokenVideoSource === videoUrl
+  const progressionCycle = exercise ? formatProgressionCycle(exercise) : null
+  const progressionSource = exercise ? formatProgressionSource(exercise) : null
 
   useEffect(() => {
     if (!exercise) {
@@ -176,6 +183,33 @@ export function SessionExerciseDetailsModal({
 
             {exercise.nextTargetHint ? (
               <p className="note">{exercise.nextTargetHint}</p>
+            ) : null}
+
+            {showProgressionInsights ? (
+              <section className="exercise-section">
+                <h4>Progression Insights</h4>
+                {progressionCycle ? (
+                  <p className="muted">Current value window: {progressionCycle}</p>
+                ) : null}
+                {progressionSource ? (
+                  <p className="muted">Value source: {progressionSource}</p>
+                ) : null}
+                {exercise.progressionCycleStatus ? (
+                  <p className="muted">
+                    Basis: {exercise.progressionCycleStatus.basis === 'successfulTrackSessions' ? 'successful sessions' : 'completed sessions'} | Frequency:{' '}
+                    {exercise.progressionCycleStatus.effectiveFrequencySessions} sessions
+                  </p>
+                ) : null}
+                {exercise.recentExerciseHistory && exercise.recentExerciseHistory.length > 0 ? (
+                  <div className="exercise-card-history">
+                    {exercise.recentExerciseHistory.slice(0, 3).map((entry) => (
+                      <span key={`${exercise.id}-modal-${entry.completedAt}`} className="exercise-history-chip">
+                        {formatExerciseHistoryEntry(entry)}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
             ) : null}
 
             {exercise.note ? (

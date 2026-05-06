@@ -1,4 +1,4 @@
-﻿.app-shell {
+.app-shell {
   max-width: 1200px;
   margin: 0 auto;
   padding: 1rem 1rem calc(2.5rem + env(safe-area-inset-bottom, 0px));
@@ -353,6 +353,37 @@ button:disabled:hover {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-size: 0.72rem;
+}
+
+.exercise-card-insights {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.exercise-card-insight-row {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.exercise-card-insight-row strong {
+  color: var(--text);
+  margin-right: 0.3rem;
+}
+
+.exercise-card-history {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.exercise-history-chip {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-a);
+  color: var(--muted);
+  font-size: 0.75rem;
+  padding: 0.14rem 0.45rem;
 }
 
 .exercise-card-info-wrap {

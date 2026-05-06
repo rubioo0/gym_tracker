@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { PlannedExercise } from '../../domain/types'
 import {
+  formatExerciseHistoryEntry,
   formatPlannedMaxWeightOverview,
   formatPlannedWeightDetails,
   formatPlannedWeightOverview,
+  formatProgressionCycle,
+  formatProgressionSource,
   getEmbeddableVideoUrl,
   isDirectPlayableVideoUrl,
 } from './sessionPlanUtils'
@@ -124,6 +127,37 @@ describe('sessionPlanUtils planned weight formatters', () => {
     expect(formatPlannedWeightDetails(exercise)).toBe(
       '33.1 lbs (15.0 kg) на кожну руку (total: 66.1 lbs (30.0 kg))',
     )
+  })
+
+  it('formats progression cycle and source labels', () => {
+    const exercise = makeExercise({
+      progressionValueSource: 'baselineAnchor',
+      progressionCycleStatus: {
+        basis: 'successfulTrackSessions',
+        effectiveFrequencySessions: 2,
+        sessionsSinceAnchor: 5,
+        completedInCurrentValueWindow: 2,
+        plannedWindowSize: 2,
+        displayNumerator: 2,
+        displayDenominator: 4,
+        isHeldBeyondPlannedWindow: true,
+      },
+    })
+
+    expect(formatProgressionCycle(exercise)).toBe('2/4 (held)')
+    expect(formatProgressionSource(exercise)).toBe('anchored progression')
+  })
+
+  it('formats short history entry labels', () => {
+    const label = formatExerciseHistoryEntry({
+      completedAt: '2026-04-09T08:00:00.000Z',
+      actualWeight: 17,
+      plannedWeight: 17,
+      weightUnit: 'lbs',
+      successful: true,
+      skipped: false,
+    })
+    expect(label).toContain('17 lbs')
   })
 })
 

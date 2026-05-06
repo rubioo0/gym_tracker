@@ -1953,4 +1953,174 @@ describe('logic helpers', () => {
     expect(plannedExercise?.maxPlannedWeight).toBe(55)
     expect(plannedExercise?.maxWeightExplanation).toContain('= 55 kg')
   })
+
+  it('builds cycle status and recent history for planned exercises', () => {
+    const run: FocusRun = {
+      id: 'run-cycle-status',
+      templateId: 'template-cycle-status',
+      templateName: 'Cycle Status',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'arms',
+      status: 'active',
+      startedAt: '2026-04-01T08:00:00.000Z',
+      completedSessionCount: 5,
+      successfulSessionCount: 5,
+      nextSessionIndex: 0,
+    }
+
+    const template: ProgramTemplate = {
+      id: 'template-cycle-status',
+      name: 'Cycle Status',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'arms',
+      sessions: [
+        {
+          id: 'session-1',
+          name: 'Session 1',
+          order: 1,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'curl',
+              name: 'Curl',
+              sets: '4',
+              reps: '10',
+              plannedWeight: 15,
+              weightUnit: 'lbs',
+              progressionRule: {
+                type: 'weight',
+                amount: 2,
+                frequency: 2,
+                basis: 'trackSessions',
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    const logs: WorkoutLog[] = [
+      {
+        id: 'log-1',
+        runId: 'run-cycle-status',
+        templateId: 'template-cycle-status',
+        sessionId: 'session-1',
+        sessionName: 'Session 1',
+        track: 'upper',
+        completedAt: '2026-04-01T08:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'curl',
+            exerciseName: 'Curl',
+            completed: true,
+            skipped: false,
+            plannedWeight: 15,
+            actualWeight: 15,
+            weightUnit: 'lbs',
+          },
+        ],
+        optionalActivities: [],
+      },
+      {
+        id: 'log-2',
+        runId: 'run-cycle-status',
+        templateId: 'template-cycle-status',
+        sessionId: 'session-1',
+        sessionName: 'Session 1',
+        track: 'upper',
+        completedAt: '2026-04-03T08:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'curl',
+            exerciseName: 'Curl',
+            completed: true,
+            skipped: false,
+            plannedWeight: 15,
+            actualWeight: 15,
+            weightUnit: 'lbs',
+          },
+        ],
+        optionalActivities: [],
+      },
+      {
+        id: 'log-3',
+        runId: 'run-cycle-status',
+        templateId: 'template-cycle-status',
+        sessionId: 'session-1',
+        sessionName: 'Session 1',
+        track: 'upper',
+        completedAt: '2026-04-05T08:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'curl',
+            exerciseName: 'Curl',
+            completed: true,
+            skipped: false,
+            plannedWeight: 17,
+            actualWeight: 17,
+            weightUnit: 'lbs',
+          },
+        ],
+        optionalActivities: [],
+      },
+      {
+        id: 'log-4',
+        runId: 'run-cycle-status',
+        templateId: 'template-cycle-status',
+        sessionId: 'session-1',
+        sessionName: 'Session 1',
+        track: 'upper',
+        completedAt: '2026-04-07T08:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'curl',
+            exerciseName: 'Curl',
+            completed: true,
+            skipped: false,
+            plannedWeight: 17,
+            actualWeight: 17,
+            weightUnit: 'lbs',
+          },
+        ],
+        optionalActivities: [],
+      },
+      {
+        id: 'log-5',
+        runId: 'run-cycle-status',
+        templateId: 'template-cycle-status',
+        sessionId: 'session-1',
+        sessionName: 'Session 1',
+        track: 'upper',
+        completedAt: '2026-04-09T08:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'curl',
+            exerciseName: 'Curl',
+            completed: true,
+            skipped: false,
+            plannedWeight: 17,
+            actualWeight: 17,
+            weightUnit: 'lbs',
+          },
+        ],
+        optionalActivities: [],
+      },
+    ]
+
+    const planned = buildPlannedSession(run, template, logs)
+    const exercise = planned.exercises[0]
+
+    expect(exercise.progressionCycleStatus?.displayNumerator).toBe(2)
+    expect(exercise.progressionCycleStatus?.displayDenominator).toBe(4)
+    expect(exercise.progressionCycleStatus?.isHeldBeyondPlannedWindow).toBe(true)
+    expect(exercise.recentExerciseHistory).toHaveLength(3)
+    expect(exercise.recentExerciseHistory?.[0].completedAt).toBe('2026-04-09T08:00:00.000Z')
+  })
 })

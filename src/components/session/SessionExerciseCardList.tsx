@@ -1,6 +1,9 @@
 import type { PlannedExercise } from '../../domain/types'
 import {
+  formatExerciseHistoryEntry,
   formatPlannedWeightOverview,
+  formatProgressionCycle,
+  formatProgressionSource,
   getExerciseCategory,
   getExerciseCategoryLabel,
 } from './sessionPlanUtils'
@@ -8,6 +11,7 @@ import {
 interface SessionExerciseCardListProps {
   exercises: PlannedExercise[]
   selectedExerciseId: string | null
+  showProgressionInsights: boolean
   onOpenExercise: (
     exerciseId: string,
     trigger: HTMLButtonElement,
@@ -17,6 +21,7 @@ interface SessionExerciseCardListProps {
 export function SessionExerciseCardList({
   exercises,
   selectedExerciseId,
+  showProgressionInsights,
   onOpenExercise,
 }: SessionExerciseCardListProps) {
   return (
@@ -25,6 +30,9 @@ export function SessionExerciseCardList({
         const isActive = selectedExerciseId === exercise.id
         const category = getExerciseCategory(exercise.name)
         const categoryLabel = getExerciseCategoryLabel(category)
+        const progressionCycle = formatProgressionCycle(exercise)
+        const progressionSource = formatProgressionSource(exercise)
+        const recentHistory = exercise.recentExerciseHistory ?? []
 
         return (
           <li key={exercise.id} className="exercise-card-item">
@@ -59,6 +67,30 @@ export function SessionExerciseCardList({
                   {formatPlannedWeightOverview(exercise)}
                 </span>
               </div>
+
+              {showProgressionInsights ? (
+                <div className="exercise-card-insights">
+                  {progressionCycle ? (
+                    <p className="exercise-card-insight-row">
+                      <strong>Cycle</strong> {progressionCycle}
+                    </p>
+                  ) : null}
+                  {progressionSource ? (
+                    <p className="exercise-card-insight-row">
+                      <strong>Source</strong> {progressionSource}
+                    </p>
+                  ) : null}
+                  {recentHistory.length > 0 ? (
+                    <div className="exercise-card-history">
+                      {recentHistory.slice(0, 3).map((entry) => (
+                        <span key={`${exercise.id}-${entry.completedAt}`} className="exercise-history-chip">
+                          {formatExerciseHistoryEntry(entry)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </button>
           </li>
         )
