@@ -428,7 +428,7 @@ describe('logic helpers', () => {
     expect(planned.maxWeightExplanation).toContain('sessions left 13 (~6.5 weeks)')
   })
 
-  it('uses imported planned weight as baseline when latest log planned weight is stale', () => {
+  it('continues template-based progression even when latest log planned weight is stale', () => {
     const run: FocusRun = {
       id: 'run-1',
       templateId: 'template-1',
@@ -550,12 +550,12 @@ describe('logic helpers', () => {
     const planned = buildPlannedSession(run, template, workoutLogs)
     const calendar = buildProgramCalendar(run, template, workoutLogs)
 
-    expect(planned.exercises[0].plannedWeight).toBe(15)
-    expect(planned.exercises[0].maxPlannedWeight).toBe(30)
+    expect(planned.exercises[0].plannedWeight).toBe(17.5)
+    expect(planned.exercises[0].maxPlannedWeight).toBe(32.5)
     expect(planned.exercises[0].maxWeightExplanation).toContain('sessions left 13 (~6.5 weeks)')
-    expect(calendar.sessions[3].exercises[0].plannedWeight).toBe(15)
-    expect(calendar.sessions[11].exercises[0].plannedWeight).toBe(25)
-    expect(calendar.sessions[15].exercises[0].plannedWeight).toBe(30)
+    expect(calendar.sessions[3].exercises[0].plannedWeight).toBe(17.5)
+    expect(calendar.sessions[11].exercises[0].plannedWeight).toBe(27.5)
+    expect(calendar.sessions[15].exercises[0].plannedWeight).toBe(32.5)
   })
 
   it('computes remaining-program max from current baseline for weekly progression', () => {
@@ -1549,5 +1549,126 @@ describe('logic helpers', () => {
       baselineAnchor: anchor,
     })
     expect(s6.plannedWeight).toBe(25)
+  })
+
+  it('matches next session weights between session plan and first projected calendar session after anchor resets', () => {
+    const run: FocusRun = {
+      id: 'run-anchor-calendar',
+      templateId: 'template-anchor-calendar',
+      templateName: 'Anchor Calendar',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'strength',
+      status: 'active',
+      startedAt: '2026-04-01T08:00:00.000Z',
+      completedSessionCount: 5,
+      successfulSessionCount: 5,
+      nextSessionIndex: 0,
+      baselineAnchors: {
+        lower: {
+          weight: 15,
+          resetAtSessionIndex: 4,
+          resetAt: '2026-04-20T08:00:00.000Z',
+        },
+        higher: {
+          weight: 20,
+          resetAtSessionIndex: 2,
+          resetAt: '2026-04-12T08:00:00.000Z',
+        },
+      },
+    }
+
+    const template: ProgramTemplate = {
+      id: 'template-anchor-calendar',
+      name: 'Anchor Calendar',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'strength',
+      sessions: [
+        {
+          id: 'session-1',
+          name: 'Session 1',
+          order: 1,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'lower',
+              name: 'Lower Reset',
+              sets: '4',
+              reps: '10',
+              plannedWeight: 10,
+              weightUnit: 'kg',
+              progressionRule: {
+                type: 'weight',
+                amount: 5,
+                frequency: 2,
+                basis: 'successfulTrackSessions',
+              },
+            },
+            {
+              id: 'higher',
+              name: 'Higher Reset',
+              sets: '4',
+              reps: '10',
+              plannedWeight: 10,
+              weightUnit: 'kg',
+              progressionRule: {
+                type: 'weight',
+                amount: 5,
+                frequency: 2,
+                basis: 'successfulTrackSessions',
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    const workoutLogs: WorkoutLog[] = Array.from({ length: 5 }, (_, index) => ({
+      id: `log-${index + 1}`,
+      runId: 'run-anchor-calendar',
+      templateId: 'template-anchor-calendar',
+      sessionId: 'session-1',
+      sessionName: 'Session 1',
+      track: 'upper',
+      completedAt: `2026-04-0${index + 1}T08:00:00.000Z`,
+      successful: true,
+      exerciseLogs: [
+        {
+          exerciseId: 'lower',
+          exerciseName: 'Lower Reset',
+          completed: true,
+          skipped: false,
+          plannedWeight: 10,
+          actualWeight: 10,
+          weightUnit: 'kg',
+        },
+        {
+          exerciseId: 'higher',
+          exerciseName: 'Higher Reset',
+          completed: true,
+          skipped: false,
+          plannedWeight: 10,
+          actualWeight: 10,
+          weightUnit: 'kg',
+        },
+      ],
+      optionalActivities: [],
+    }))
+
+    const planned = buildPlannedSession(run, template, workoutLogs)
+    const calendar = buildProgramCalendar(run, template, workoutLogs)
+    const firstProjected = calendar.sessions[run.completedSessionCount]
+    const lowerPlanned = planned.exercises.find((exercise) => exercise.id === 'lower')
+    const higherPlanned = planned.exercises.find((exercise) => exercise.id === 'higher')
+    const lowerProjected = firstProjected.exercises.find((exercise) => exercise.id === 'lower')
+    const higherProjected = firstProjected.exercises.find(
+      (exercise) => exercise.id === 'higher',
+    )
+
+    expect(lowerPlanned?.plannedWeight).toBe(15)
+    expect(lowerProjected?.plannedWeight).toBe(lowerPlanned?.plannedWeight)
+    expect(higherPlanned?.plannedWeight).toBe(25)
+    expect(higherProjected?.plannedWeight).toBe(higherPlanned?.plannedWeight)
   })
 })

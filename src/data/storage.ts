@@ -1,9 +1,7 @@
 import { seededProgramTemplates } from './seed'
+import { buildBaselineAnchorsForRun } from '../domain/logic'
 import type {
   AppState,
-  BaselineAnchor,
-  ExerciseLog,
-  ExerciseTemplate,
   FocusRun,
   ProgramTemplate,
   WorkoutLog,
@@ -107,120 +105,6 @@ function normalizeRunCounters(
       baselineAnchors,
     }
   })
-}
-
-function normalizeExerciseNameForMatching(value: string | undefined): string {
-  if (!value) {
-    return ''
-  }
-
-  return value
-    .toLowerCase()
-    .replace(/\s+/g, '')
-    .replace(/[^a-z0-9а-яіїєґ]/gi, '')
-}
-
-function isSameExercise(exercise: ExerciseTemplate, candidate: ExerciseLog): boolean {
-  if (candidate.exerciseId === exercise.id) {
-    return true
-  }
-
-  const targetName = normalizeExerciseNameForMatching(exercise.name)
-  const candidateName = normalizeExerciseNameForMatching(candidate.exerciseName)
-  return targetName.length > 0 && targetName === candidateName
-}
-
-function normalizeWeightUnitForProgression(
-  unit: string | undefined,
-): 'kg' | 'lbs' | undefined {
-  if (!unit) {
-    return undefined
-  }
-
-  const normalized = unit.toLowerCase()
-  if (normalized.includes('lb')) {
-    return 'lbs'
-  }
-
-  if (normalized.includes('kg') || normalized.includes('кг')) {
-    return 'kg'
-  }
-
-  return undefined
-}
-
-function hasWeightUnitMismatch(
-  templateUnit: string | undefined,
-  logUnit: string | undefined,
-): boolean {
-  const normalizedTemplate = normalizeWeightUnitForProgression(templateUnit)
-  const normalizedLog = normalizeWeightUnitForProgression(logUnit)
-  return Boolean(
-    normalizedTemplate && normalizedLog && normalizedTemplate !== normalizedLog,
-  )
-}
-
-function buildBaselineAnchorsForRun(
-  template: ProgramTemplate | undefined,
-  runLogs: WorkoutLog[],
-): Record<string, BaselineAnchor> | undefined {
-  if (!template || runLogs.length === 0) {
-    return undefined
-  }
-
-  const exercises = template.sessions.flatMap((session) => session.exercises)
-  if (exercises.length === 0) {
-    return undefined
-  }
-
-  const sortedLogs = [...runLogs].sort((a, b) => {
-    const timeA = new Date(a.completedAt).getTime()
-    const timeB = new Date(b.completedAt).getTime()
-    const safeA = Number.isNaN(timeA) ? 0 : timeA
-    const safeB = Number.isNaN(timeB) ? 0 : timeB
-    return safeA - safeB
-  })
-
-  const anchors: Record<string, BaselineAnchor> = {}
-
-  sortedLogs.forEach((log, logIndex) => {
-    for (const exercise of exercises) {
-      const match = log.exerciseLogs.find((candidate) =>
-        isSameExercise(exercise, candidate),
-      )
-
-      if (!match || match.skipped) {
-        continue
-      }
-
-      if (hasWeightUnitMismatch(exercise.weightUnit, match.weightUnit)) {
-        continue
-      }
-
-      const actualWeight = match.actualWeight
-      const plannedWeight = match.plannedWeight
-      if (
-        typeof actualWeight !== 'number' ||
-        !Number.isFinite(actualWeight) ||
-        typeof plannedWeight !== 'number' ||
-        !Number.isFinite(plannedWeight)
-      ) {
-        continue
-      }
-
-      if (Math.abs(actualWeight - plannedWeight) <= 0.01) {
-        continue
-      }
-
-      anchors[exercise.id] = {
-        weight: actualWeight,
-        resetAtSessionIndex: logIndex,
-        resetAt: log.completedAt,
-      }
-    }
-  })
-
-  return Object.keys(anchors).length > 0 ? anchors : undefined
 }
 
 function mergeDuplicateTemplateRuns(
