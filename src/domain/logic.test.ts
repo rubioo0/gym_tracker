@@ -1800,4 +1800,155 @@ describe('logic helpers', () => {
     expect(higherPlanned?.plannedWeight).toBe(25)
     expect(higherProjected?.plannedWeight).toBe(higherPlanned?.plannedWeight)
   })
+
+  it('keeps session plan progression aligned with calendar for alternating sessions', () => {
+    const run: FocusRun = {
+      id: 'run-alt-sync',
+      templateId: 'template-alt-sync',
+      templateName: 'Alternating',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'strength',
+      status: 'active',
+      startedAt: '2026-04-01T08:00:00.000Z',
+      completedSessionCount: 3,
+      successfulSessionCount: 3,
+      nextSessionIndex: 1,
+    }
+
+    const template: ProgramTemplate = {
+      id: 'template-alt-sync',
+      name: 'Alternating',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'strength',
+      sessions: [
+        {
+          id: 'session-a',
+          name: 'Session A',
+          order: 1,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'a-only',
+              name: 'A Only',
+              sets: '4',
+              reps: '8',
+              plannedWeight: 50,
+              weightUnit: 'kg',
+              progressionRule: {
+                type: 'weight',
+                amount: 5,
+                frequency: 2,
+                basis: 'successfulTrackSessions',
+              },
+            },
+          ],
+        },
+        {
+          id: 'session-b',
+          name: 'Session B',
+          order: 2,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'b-only',
+              name: 'B Only',
+              sets: '4',
+              reps: '8',
+              plannedWeight: 40,
+              weightUnit: 'kg',
+              progressionRule: {
+                type: 'weight',
+                amount: 2.5,
+                frequency: 2,
+                basis: 'successfulTrackSessions',
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    const workoutLogs: WorkoutLog[] = [
+      {
+        id: 'log-1',
+        runId: 'run-alt-sync',
+        templateId: 'template-alt-sync',
+        sessionId: 'session-a',
+        sessionName: 'Session A',
+        track: 'upper',
+        completedAt: '2026-04-01T08:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'a-only',
+            exerciseName: 'A Only',
+            completed: true,
+            skipped: false,
+            plannedWeight: 50,
+            actualWeight: 50,
+            weightUnit: 'kg',
+          },
+        ],
+        optionalActivities: [],
+      },
+      {
+        id: 'log-2',
+        runId: 'run-alt-sync',
+        templateId: 'template-alt-sync',
+        sessionId: 'session-b',
+        sessionName: 'Session B',
+        track: 'upper',
+        completedAt: '2026-04-03T08:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'b-only',
+            exerciseName: 'B Only',
+            completed: true,
+            skipped: false,
+            plannedWeight: 40,
+            actualWeight: 40,
+            weightUnit: 'kg',
+          },
+        ],
+        optionalActivities: [],
+      },
+      {
+        id: 'log-3',
+        runId: 'run-alt-sync',
+        templateId: 'template-alt-sync',
+        sessionId: 'session-a',
+        sessionName: 'Session A',
+        track: 'upper',
+        completedAt: '2026-04-05T08:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'a-only',
+            exerciseName: 'A Only',
+            completed: true,
+            skipped: false,
+            plannedWeight: 55,
+            actualWeight: 55,
+            weightUnit: 'kg',
+          },
+        ],
+        optionalActivities: [],
+      },
+    ]
+
+    const planned = buildPlannedSession(run, template, workoutLogs)
+    const calendar = buildProgramCalendar(run, template, workoutLogs)
+    const nextCalendarSession = calendar.sessions[run.completedSessionCount]
+    const plannedExercise = planned.exercises.find((exercise) => exercise.id === 'b-only')
+    const calendarExercise = nextCalendarSession.exercises.find(
+      (exercise) => exercise.id === 'b-only',
+    )
+
+    expect(nextCalendarSession.sessionId).toBe(planned.session.id)
+    expect(plannedExercise?.plannedWeight).toBe(42.5)
+    expect(calendarExercise?.plannedWeight).toBe(plannedExercise?.plannedWeight)
+  })
 })

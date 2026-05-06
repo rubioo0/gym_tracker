@@ -96,11 +96,11 @@ function formatDualWeightValue(value: number, unit?: string): string {
 }
 
 function getDisplayPlannedWeight(exercise: PlannedExercise): number | undefined {
-  return exercise.basePlannedWeight ?? exercise.plannedWeight
+  return exercise.plannedWeight ?? exercise.basePlannedWeight
 }
 
 function getDisplayPlannedWeightPerSide(exercise: PlannedExercise): number | undefined {
-  return exercise.basePlannedWeightPerSide ?? exercise.plannedWeightPerSide
+  return exercise.plannedWeightPerSide ?? exercise.basePlannedWeightPerSide
 }
 
 export function formatPlannedWeightOverview(exercise: PlannedExercise): string {

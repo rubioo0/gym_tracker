@@ -110,6 +110,21 @@ describe('sessionPlanUtils planned weight formatters', () => {
     expect(formatPlannedWeightOverview(exercise)).toBe('body + 7.5 kg')
     expect(formatPlannedWeightDetails(exercise)).toBe('body + 7.5 kg')
   })
+
+  it('prefers effective progressed weights over base values', () => {
+    const exercise = makeExercise({
+      plannedWeight: 30,
+      basePlannedWeight: 20,
+      plannedWeightPerSide: 15,
+      basePlannedWeightPerSide: 10,
+      weightUnit: 'kg',
+    })
+
+    expect(formatPlannedWeightOverview(exercise)).toBe('15 kg на кожну руку')
+    expect(formatPlannedWeightDetails(exercise)).toBe(
+      '33.1 lbs (15.0 kg) на кожну руку (total: 66.1 lbs (30.0 kg))',
+    )
+  })
 })
 
 describe('sessionPlanUtils video helpers', () => {

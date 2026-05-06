@@ -523,6 +523,11 @@ function projectPlannedExerciseForSessionIndex(
         (planned.plannedWeightPerSide + progressionDelta * perSideIncrement).toFixed(2),
       )
     }
+    planned.plannedLoadLabel = buildPlannedLoadLabel(
+      exercise,
+      planned.plannedWeight,
+      planned.plannedWeightPerSide,
+    )
 
     return planned
   }
@@ -705,6 +710,9 @@ export function buildPlannedSession(
   const runLogs = workoutLogs
     .filter((workoutLog) => workoutLog.runId === run.id)
     .sort((a, b) => (a.completedAt < b.completedAt ? 1 : -1))
+  // Use run occurrence index as the shared projection point for both
+  // Session Plan and Calendar so they always show the same "next session" load.
+  const nextProgramSessionIndex = runLogs.length
 
   return {
     run,
@@ -719,13 +727,14 @@ export function buildPlannedSession(
       )
 
       const baselineAnchor = run.baselineAnchors?.[exercise.id]
-      const plannedExercise = getPlannedExercise(
+      const plannedExercise = projectPlannedExerciseForSessionIndex(
         exercise,
         exerciseCounters,
         {
           latestCompletedActualWeight,
           baselineAnchor,
         },
+        nextProgramSessionIndex,
       )
 
       const projectedLastSessionExercise = projectPlannedExerciseForSessionIndex(
