@@ -1,7 +1,7 @@
 .calendar-header {
   display: flex;
   gap: 2rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid var(--color-border, #ddd);
   flex-wrap: wrap;
@@ -10,20 +10,21 @@
 .calendar-header-stat {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.3rem;
 }
 
 .calendar-header-stat strong {
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   color: var(--color-text-muted, #666);
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.04em;
 }
 
 .calendar-header-stat {
   color: var(--color-text-primary, #222);
-  font-size: 0.95rem;
+  font-size: 0.98rem;
+  line-height: 1.35;
 }
 
 .calendar-sessions {
@@ -34,7 +35,7 @@
 
 .calendar-session {
   border: 1px solid var(--color-border, #ddd);
-  border-radius: 4px;
+  border-radius: 10px;
   overflow: hidden;
   background: var(--color-bg-secondary, #fafafa);
   transition: box-shadow 0.2s ease, background-color 0.2s ease;
@@ -58,14 +59,18 @@
   display: flex;
   align-items: center;
   width: 100%;
-  padding: 0.75rem 1rem;
+  min-height: 54px;
+  padding: 0.85rem 1rem;
   background: transparent;
   border: none;
   cursor: pointer;
   text-align: left;
   gap: 1rem;
-  font-size: 0.95rem;
+  font-size: 1rem;
+  line-height: 1.35;
   transition: background-color 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .session-header:hover {
@@ -79,24 +84,26 @@
 .session-number {
   font-weight: 700;
   color: var(--color-text-secondary, #444);
-  min-width: 80px;
-  font-size: 0.85rem;
+  min-width: 88px;
+  font-size: 0.83rem;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .session-name {
   flex: 1;
   color: var(--color-text-primary, #222);
   font-weight: 600;
+  line-height: 1.35;
 }
 
 .session-track {
-  padding: 0.25rem 0.5rem;
-  border-radius: 3px;
-  font-size: 0.75rem;
+  padding: 0.28rem 0.58rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.04em;
   background-color: rgba(0, 0, 0, 0.08);
   color: var(--color-text-secondary, #444);
 }
@@ -117,11 +124,12 @@
 }
 
 .session-status {
-  font-size: 0.8rem;
+  font-size: 0.84rem;
   color: var(--color-text-muted, #666);
   white-space: nowrap;
-  min-width: 120px;
+  min-width: 126px;
   text-align: right;
+  line-height: 1.35;
 }
 
 .session-status.projected {
@@ -130,12 +138,12 @@
 }
 
 .session-exercises {
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1rem;
   background-color: rgba(255, 255, 255, 0.6);
   border-top: 1px solid rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.7rem;
 }
 
 .exercise-row {
@@ -143,7 +151,7 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
-  padding: 0.5rem 0;
+  padding: 0.55rem 0;
   border-bottom: 1px solid rgba(0, 0, 0, 0.03);
 }
 
@@ -154,8 +162,9 @@
 .exercise-name {
   font-weight: 600;
   color: var(--color-text-primary, #222);
-  min-width: 150px;
-  font-size: 0.9rem;
+  min-width: 140px;
+  font-size: 0.92rem;
+  line-height: 1.35;
 }
 
 .exercise-details {
@@ -168,11 +177,11 @@
 }
 
 .exercise-meta {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   color: var(--color-text-muted, #666);
   background-color: rgba(0, 0, 0, 0.05);
-  padding: 0.25rem 0.5rem;
-  border-radius: 3px;
+  padding: 0.3rem 0.56rem;
+  border-radius: 7px;
   min-width: 60px;
   text-align: center;
 }
@@ -189,53 +198,123 @@
   color: var(--color-text-primary, #222);
   font-size: 0.9rem;
   background-color: rgba(76, 175, 80, 0.1);
-  padding: 0.25rem 0.75rem;
-  border-radius: 3px;
+  padding: 0.32rem 0.76rem;
+  border-radius: 7px;
 }
 
 .exercise-actual {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   color: var(--color-success, #4caf50);
   font-weight: 500;
   background-color: rgba(76, 175, 80, 0.1);
-  padding: 0.25rem 0.75rem;
-  border-radius: 3px;
+  padding: 0.32rem 0.76rem;
+  border-radius: 7px;
 }
 
 .exercise-skipped {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   color: var(--color-warning, #ff9800);
   font-weight: 500;
   background-color: rgba(255, 152, 0, 0.1);
-  padding: 0.25rem 0.75rem;
-  border-radius: 3px;
+  padding: 0.32rem 0.76rem;
+  border-radius: 7px;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
+  .calendar-header {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+    margin-bottom: 1rem;
+  }
+
+  .calendar-header-stat {
+    border: 1px solid var(--color-border, #ddd);
+    border-radius: 10px;
+    background: var(--color-bg-secondary, #fafafa);
+    padding: 0.6rem 0.7rem;
+  }
+
   .session-header {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     align-items: flex-start;
-    gap: 0.5rem;
+    gap: 0.42rem 0.55rem;
+    min-height: 60px;
+    padding: 0.85rem 0.9rem;
+    font-size: 0.96rem;
   }
 
   .session-number {
     min-width: auto;
+    flex-basis: 100%;
+    font-size: 0.78rem;
+    color: var(--color-text-muted, #666);
+  }
+
+  .session-name {
+    flex-basis: 100%;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .session-track {
+    font-size: 0.72rem;
+    padding: 0.24rem 0.54rem;
   }
 
   .session-status {
-    min-width: auto;
-    text-align: left;
+    min-width: 0;
+    margin-left: auto;
+    text-align: right;
+    font-size: 0.8rem;
   }
 
   .exercise-details {
     justify-content: flex-start;
     flex-direction: column;
     align-items: flex-start;
+    gap: 0.5rem;
   }
 
-  .calendar-header {
+  .exercise-row {
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.45rem;
+    padding: 0.62rem 0;
+  }
+
+  .exercise-name {
+    min-width: 0;
+    width: 100%;
+    font-size: 0.95rem;
+  }
+
+  .exercise-meta,
+  .exercise-weight .per-side,
+  .exercise-weight .total,
+  .exercise-actual,
+  .exercise-skipped {
+    font-size: 0.84rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .session-header {
+    padding: 0.78rem 0.78rem;
+  }
+
+  .session-name {
+    font-size: 0.95rem;
+  }
+
+  .session-status {
+    width: 100%;
+    text-align: left;
+    margin-left: 0;
+  }
+
+  .session-exercises {
+    padding: 0.72rem 0.78rem;
   }
 }
