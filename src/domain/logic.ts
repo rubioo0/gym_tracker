@@ -1,5 +1,6 @@
 import type {
   AppState,
+  BaselineAnchor,
   ExerciseTemplate,
   ExerciseLog,
   FocusRun,
@@ -30,6 +31,7 @@ interface PlannedExerciseOptions {
 const FIXED_PROGRAM_WEEKS = 8
 const FIXED_PROGRAM_SESSIONS = 16
 const SESSIONS_PER_WEEK = FIXED_PROGRAM_SESSIONS / FIXED_PROGRAM_WEEKS
+const PROGRESSION_WEIGHT_TOLERANCE = 0.01
 
 export function makeId(): string {
   return crypto.randomUUID()
@@ -141,6 +143,17 @@ function normalizeWeightUnitForProgression(
   }
 
   return undefined
+}
+
+function hasWeightUnitMismatch(
+  templateUnit: string | undefined,
+  logUnit: string | undefined,
+): boolean {
+  const normalizedTemplate = normalizeWeightUnitForProgression(templateUnit)
+  const normalizedLog = normalizeWeightUnitForProgression(logUnit)
+  return Boolean(
+    normalizedTemplate && normalizedLog && normalizedTemplate !== normalizedLog,
+  )
 }
 
 function normalizeExerciseNameForMatching(value: string | undefined): string {
@@ -558,18 +571,6 @@ function getLatestCompletedActualWeight(
     return undefined
   }
 
-  // If planned weight was overridden (e.g. import/manual edit), old logs are not
-  // a valid baseline regardless of whether weight units were persisted on the log.
-  if (
-    typeof exercise.plannedWeight === 'number' &&
-    Number.isFinite(exercise.plannedWeight) &&
-    typeof latestLog.plannedWeight === 'number' &&
-    Number.isFinite(latestLog.plannedWeight) &&
-    Math.abs(exercise.plannedWeight - latestLog.plannedWeight) > 0.01
-  ) {
-    return undefined
-  }
-
   if (
     typeof latestLog.actualWeight === 'number' &&
     Number.isFinite(latestLog.actualWeight)
@@ -622,6 +623,77 @@ function getExerciseProgressionCounters(
     completedSessionCount,
     successfulSessionCount,
   }
+}
+
+export function buildBaselineAnchorsForRun(
+  template: ProgramTemplate | undefined,
+  runLogs: WorkoutLog[],
+): Record<string, BaselineAnchor> | undefined {
+  if (!template || runLogs.length === 0) {
+    return undefined
+  }
+
+  const exercises = template.sessions.flatMap((session) => session.exercises)
+  if (exercises.length === 0) {
+    return undefined
+  }
+
+  const sortedLogs = [...runLogs].sort((a, b) => {
+    const timeA = new Date(a.completedAt).getTime()
+    const timeB = new Date(b.completedAt).getTime()
+    const safeA = Number.isNaN(timeA) ? 0 : timeA
+    const safeB = Number.isNaN(timeB) ? 0 : timeB
+    return safeA - safeB
+  })
+
+  const anchors: Record<string, BaselineAnchor> = {}
+  const exerciseCompleted = new Map<string, number>()
+  const exerciseSuccessful = new Map<string, number>()
+
+  sortedLogs.forEach((log) => {
+    for (const exercise of exercises) {
+      const match = log.exerciseLogs.find((candidate) =>
+        isSameExercise(exercise, candidate),
+      )
+
+      if (!match || !match.completed || match.skipped) {
+        continue
+      }
+
+      const currentCompleted = exerciseCompleted.get(exercise.id) ?? 0
+      const currentSuccessful = exerciseSuccessful.get(exercise.id) ?? 0
+
+      if (!hasWeightUnitMismatch(exercise.weightUnit, match.weightUnit)) {
+        const actualWeight = match.actualWeight
+        const plannedWeight = match.plannedWeight
+        if (
+          typeof actualWeight === 'number' &&
+          Number.isFinite(actualWeight) &&
+          typeof plannedWeight === 'number' &&
+          Number.isFinite(plannedWeight) &&
+          Math.abs(actualWeight - plannedWeight) > PROGRESSION_WEIGHT_TOLERANCE
+        ) {
+          const resetIndex =
+            exercise.progressionRule?.basis === 'successfulTrackSessions'
+              ? currentSuccessful
+              : currentCompleted
+
+          anchors[exercise.id] = {
+            weight: Number(actualWeight.toFixed(2)),
+            resetAtSessionIndex: resetIndex,
+            resetAt: log.completedAt,
+          }
+        }
+      }
+
+      exerciseCompleted.set(exercise.id, currentCompleted + 1)
+      if (log.successful) {
+        exerciseSuccessful.set(exercise.id, currentSuccessful + 1)
+      }
+    }
+  })
+
+  return Object.keys(anchors).length > 0 ? anchors : undefined
 }
 
 export function buildPlannedSession(
@@ -765,12 +837,14 @@ export function buildProgramCalendar(
         exercise,
         exercise.weightUnit,
       )
+      const baselineAnchor = run.baselineAnchors?.[exercise.id]
 
       const plannedExercise = projectPlannedExerciseForSessionIndex(
         exercise,
         exerciseCounters,
         {
           latestCompletedActualWeight,
+          baselineAnchor,
         },
         sessionIndex,
       )

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { seededProgramTemplates } from '../data/seed'
-import { createInitialState } from '../data/storage'
+import { createInitialState, importStateFromJson } from '../data/storage'
 import { buildPlannedSession, getTemplateById } from './logic'
 import { appReducer } from './reducer'
 import type { ProgramTemplate, WorkoutLog } from './types'
@@ -184,6 +184,292 @@ describe('app reducer', () => {
       weight: 15,
       resetAtSessionIndex: 0,
     })
+  })
+
+  it('does not create an anchor when mismatch log is not completed', () => {
+    const templates: ProgramTemplate[] = [
+      {
+        id: 'non-completed-template',
+        name: 'Non Completed',
+        mode: 'main',
+        track: 'upper',
+        focusTarget: 'arms',
+        sessions: [
+          {
+            id: 'non-completed-session',
+            name: 'Session',
+            order: 1,
+            track: 'upper',
+            exercises: [
+              {
+                id: 'non-completed-exercise',
+                name: 'Curl',
+                sets: '3 sets',
+                reps: '10',
+                plannedWeight: 10,
+                weightUnit: 'kg',
+                progressionRule: {
+                  type: 'weight',
+                  amount: 5,
+                  frequency: 2,
+                  basis: 'successfulTrackSessions',
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ]
+
+    const started = appReducer(createInitialState(templates), {
+      type: 'startRun',
+      templateId: 'non-completed-template',
+      now: '2026-04-08T10:00:00.000Z',
+    })
+    const run = started.focusRuns[0]
+
+    const logged = appReducer(started, {
+      type: 'logSession',
+      payload: {
+        runId: run.id,
+        completedAt: '2026-04-08T11:00:00.000Z',
+        successful: true,
+        exerciseInputs: [
+          {
+            exerciseId: 'non-completed-exercise',
+            completed: false,
+            skipped: false,
+            actualWeight: 20,
+          },
+        ],
+        activityInputs: [],
+      },
+    })
+
+    const updatedRun = logged.focusRuns.find((candidate) => candidate.id === run.id)
+    expect(updatedRun?.baselineAnchors).toBeUndefined()
+  })
+
+  it('keeps linear progression stable across successful sessions without oscillation', () => {
+    const templates: ProgramTemplate[] = [
+      {
+        id: 'linear-template',
+        name: 'Linear',
+        mode: 'main',
+        track: 'upper',
+        focusTarget: 'arms',
+        sessions: [
+          {
+            id: 'linear-session',
+            name: 'Session',
+            order: 1,
+            track: 'upper',
+            exercises: [
+              {
+                id: 'linear-exercise',
+                name: 'Curl',
+                sets: '3 sets',
+                reps: '10',
+                plannedWeight: 10,
+                weightUnit: 'kg',
+                progressionRule: {
+                  type: 'weight',
+                  amount: 5,
+                  frequency: 2,
+                  basis: 'successfulTrackSessions',
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ]
+
+    let state = appReducer(createInitialState(templates), {
+      type: 'startRun',
+      templateId: 'linear-template',
+      now: '2026-04-08T10:00:00.000Z',
+    })
+
+    const seenPlannedWeights: number[] = []
+    for (let index = 0; index < 6; index++) {
+      const run = state.focusRuns[0]
+      const template = getTemplateById(state.programTemplates, run.templateId)
+      if (!template) {
+        throw new Error('template missing in test')
+      }
+
+      const planned = buildPlannedSession(run, template, state.workoutLogs)
+      const currentWeight = planned.exercises[0].plannedWeight
+      if (typeof currentWeight !== 'number') {
+        throw new Error('planned weight missing in test')
+      }
+
+      seenPlannedWeights.push(currentWeight)
+
+      state = appReducer(state, {
+        type: 'logSession',
+        payload: {
+          runId: run.id,
+          completedAt: `2026-04-${String(index + 8).padStart(2, '0')}T11:00:00.000Z`,
+          successful: true,
+          exerciseInputs: [
+            {
+              exerciseId: 'linear-exercise',
+              completed: true,
+              skipped: false,
+              actualWeight: currentWeight,
+            },
+          ],
+          activityInputs: [],
+        },
+      })
+    }
+
+    expect(seenPlannedWeights).toEqual([10, 10, 15, 15, 20, 20])
+
+    const run = state.focusRuns[0]
+    const template = getTemplateById(state.programTemplates, run.templateId)
+    if (!template) {
+      throw new Error('template missing in test')
+    }
+    const nextPlanned = buildPlannedSession(run, template, state.workoutLogs)
+    expect(nextPlanned.exercises[0].plannedWeight).toBe(25)
+  })
+
+  it('keeps next progression identical between imported hydration and importLogs rebuild', () => {
+    const rawState = {
+      programTemplates: [
+        {
+          id: 'parity-template',
+          name: 'Parity',
+          mode: 'main' as const,
+          track: 'upper' as const,
+          focusTarget: 'arms',
+          sessions: [
+            {
+              id: 'parity-session',
+              name: 'Session',
+              order: 1,
+              track: 'upper' as const,
+              exercises: [
+                {
+                  id: 'parity-exercise',
+                  name: 'Curl',
+                  sets: '3 sets',
+                  reps: '10',
+                  plannedWeight: 10,
+                  weightUnit: 'kg',
+                  progressionRule: {
+                    type: 'weight' as const,
+                    amount: 5,
+                    frequency: 2,
+                    basis: 'successfulTrackSessions' as const,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      focusRuns: [
+        {
+          id: 'parity-run',
+          templateId: 'parity-template',
+          templateName: 'Parity',
+          mode: 'main' as const,
+          track: 'upper' as const,
+          focusTarget: 'arms',
+          status: 'active' as const,
+          startedAt: '2026-04-08T08:00:00.000Z',
+          completedSessionCount: 0,
+          successfulSessionCount: 0,
+          nextSessionIndex: 0,
+        },
+      ],
+      workoutLogs: [
+        {
+          id: 'parity-log-1',
+          runId: 'parity-run',
+          templateId: 'parity-template',
+          sessionId: 'parity-session',
+          sessionName: 'Session',
+          track: 'upper' as const,
+          completedAt: '2026-04-08T11:00:00.000Z',
+          successful: true,
+          exerciseLogs: [
+            {
+              exerciseId: 'parity-exercise',
+              exerciseName: 'Curl',
+              completed: true,
+              skipped: false,
+              plannedWeight: 10,
+              actualWeight: 10,
+              weightUnit: 'kg',
+            },
+          ],
+          optionalActivities: [],
+        },
+        {
+          id: 'parity-log-2',
+          runId: 'parity-run',
+          templateId: 'parity-template',
+          sessionId: 'parity-session',
+          sessionName: 'Session',
+          track: 'upper' as const,
+          completedAt: '2026-04-10T11:00:00.000Z',
+          successful: true,
+          exerciseLogs: [
+            {
+              exerciseId: 'parity-exercise',
+              exerciseName: 'Curl',
+              completed: true,
+              skipped: false,
+              plannedWeight: 10,
+              actualWeight: 15,
+              weightUnit: 'kg',
+            },
+          ],
+          optionalActivities: [],
+        },
+      ],
+      lastCompletedTrack: null,
+      selectedRunId: null,
+    }
+
+    const imported = importStateFromJson(JSON.stringify({ state: rawState }))
+    if (!imported) {
+      throw new Error('import failed in parity test')
+    }
+
+    const rebuilt = appReducer(imported, {
+      type: 'importLogs',
+      logs: imported.workoutLogs,
+    })
+
+    const importedRun = imported.focusRuns.find((run) => run.id === 'parity-run')
+    const rebuiltRun = rebuilt.focusRuns.find((run) => run.id === 'parity-run')
+    const importedTemplate = getTemplateById(imported.programTemplates, 'parity-template')
+    const rebuiltTemplate = getTemplateById(rebuilt.programTemplates, 'parity-template')
+    if (!importedRun || !rebuiltRun || !importedTemplate || !rebuiltTemplate) {
+      throw new Error('missing data in parity test')
+    }
+
+    const importedPlanned = buildPlannedSession(
+      importedRun,
+      importedTemplate,
+      imported.workoutLogs,
+    )
+    const rebuiltPlanned = buildPlannedSession(
+      rebuiltRun,
+      rebuiltTemplate,
+      rebuilt.workoutLogs,
+    )
+
+    expect(rebuiltRun.baselineAnchors).toEqual(importedRun.baselineAnchors)
+    expect(rebuiltPlanned.exercises.map((exercise) => exercise.plannedWeight)).toEqual(
+      importedPlanned.exercises.map((exercise) => exercise.plannedWeight),
+    )
   })
 
   it('uses logged actual bodyweight load for next planned progression', () => {
