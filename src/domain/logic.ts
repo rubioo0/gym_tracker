@@ -322,9 +322,9 @@ export function getPlannedExercise(
     let anchorSession: number
 
     if (hasBaselineAnchor) {
-      // Deviation was recorded — restart progression from anchor
+      // Deviation was recorded — restart progression after the anchor session
       anchorWeight = options!.baselineAnchor!.weight
-      anchorSession = options!.baselineAnchor!.resetAtSessionIndex
+      anchorSession = options!.baselineAnchor!.resetAtSessionIndex + 1
     } else if (hasLatestCompletedActualWeight) {
       // Normal flow — logs exist, no deviation. Compute from template base.
       anchorWeight = exercise.plannedWeight as number
@@ -336,12 +336,10 @@ export function getPlannedExercise(
       anchorSession = progressionSessionCount
     }
 
-    let sessionsSinceAnchor = getSessionsSinceReset(progressionSessionCount, anchorSession)
-    // When baseline anchor exists, the first session after deviation should hold
-    // the anchor value. Subtract 1 to delay progression by one session cycle.
-    if (hasBaselineAnchor) {
-      sessionsSinceAnchor = Math.max(0, sessionsSinceAnchor - 1)
-    }
+    const sessionsSinceAnchor = getSessionsSinceReset(
+      progressionSessionCount,
+      anchorSession,
+    )
     const steps = getProgressionSteps(sessionsSinceAnchor, effectiveFrequencySessions)
 
     const progressedWeight = clamp(
@@ -472,7 +470,7 @@ function projectPlannedExerciseForSessionIndex(
 
   let anchorSession: number
   if (hasExplicitBaselineAnchor) {
-    anchorSession = options!.baselineAnchor!.resetAtSessionIndex
+    anchorSession = options!.baselineAnchor!.resetAtSessionIndex + 1
   } else if (hasLatestActualWeight) {
     anchorSession = 0
   } else {
@@ -480,15 +478,14 @@ function projectPlannedExerciseForSessionIndex(
   }
 
   // Compute delta: additional steps between current and projected session
-  let currentSessionsSinceAnchor = getSessionsSinceReset(progressionSessionCount, anchorSession)
-  let projectedSessionsSinceAnchor = getSessionsSinceReset(sessionIndex, anchorSession)
-
-  // When baseline anchor exists, the first session after deviation should hold
-  // the anchor value. Subtract 1 to delay progression by one session cycle.
-  if (hasExplicitBaselineAnchor) {
-    currentSessionsSinceAnchor = Math.max(0, currentSessionsSinceAnchor - 1)
-    projectedSessionsSinceAnchor = Math.max(0, projectedSessionsSinceAnchor - 1)
-  }
+  const currentSessionsSinceAnchor = getSessionsSinceReset(
+    progressionSessionCount,
+    anchorSession,
+  )
+  const projectedSessionsSinceAnchor = getSessionsSinceReset(
+    sessionIndex,
+    anchorSession,
+  )
 
   const currentSteps = getProgressionSteps(currentSessionsSinceAnchor, effectiveFrequencySessions)
   const projectedSteps = getProgressionSteps(projectedSessionsSinceAnchor, effectiveFrequencySessions)

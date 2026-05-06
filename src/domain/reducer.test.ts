@@ -3,7 +3,7 @@ import { seededProgramTemplates } from '../data/seed'
 import { createInitialState } from '../data/storage'
 import { buildPlannedSession, getTemplateById } from './logic'
 import { appReducer } from './reducer'
-import type { ProgramTemplate } from './types'
+import type { ProgramTemplate, WorkoutLog } from './types'
 
 describe('app reducer', () => {
   it('starts run and marks it active', () => {
@@ -105,6 +105,85 @@ describe('app reducer', () => {
     expect(logged.focusRuns[0].nextSessionIndex).toBe(1)
     expect(logged.lastCompletedTrack).toBe('upper')
     expect(logged.selectedRunId).toBeNull()
+  })
+
+  it('rebuilds baseline anchors on log import', () => {
+    const templates: ProgramTemplate[] = [
+      {
+        id: 'anchor-template',
+        name: 'Anchor Template',
+        mode: 'main',
+        track: 'upper',
+        focusTarget: 'biceps',
+        sessions: [
+          {
+            id: 'anchor-session',
+            name: 'Anchor Session',
+            order: 1,
+            track: 'upper',
+            exercises: [
+              {
+                id: 'anchor-exercise',
+                name: 'Curl',
+                sets: '4 sets',
+                reps: '10',
+                plannedWeight: 10,
+                weightUnit: 'kg',
+                progressionRule: {
+                  type: 'weight',
+                  amount: 5,
+                  frequency: 2,
+                  basis: 'trackSessions',
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ]
+
+    const started = appReducer(createInitialState(templates), {
+      type: 'startRun',
+      templateId: 'anchor-template',
+      now: '2026-04-08T10:00:00.000Z',
+    })
+
+    const run = started.focusRuns[0]
+    const logs: WorkoutLog[] = [
+      {
+        id: 'log-1',
+        runId: run.id,
+        templateId: 'anchor-template',
+        sessionId: 'anchor-session',
+        sessionName: 'Anchor Session',
+        track: 'upper',
+        completedAt: '2026-04-08T11:00:00.000Z',
+        successful: true,
+        exerciseLogs: [
+          {
+            exerciseId: 'anchor-exercise',
+            exerciseName: 'Curl',
+            completed: true,
+            skipped: false,
+            plannedWeight: 10,
+            actualWeight: 15,
+            weightUnit: 'kg',
+          },
+        ],
+        optionalActivities: [],
+      },
+    ]
+
+    const imported = appReducer(started, {
+      type: 'importLogs',
+      logs,
+    })
+
+    const updatedRun = imported.focusRuns.find((candidate) => candidate.id === run.id)
+    expect(updatedRun?.baselineAnchors?.['anchor-exercise']).toMatchObject({
+      weight: 15,
+      resetAtSessionIndex: 0,
+    })
   })
 
   it('uses logged actual bodyweight load for next planned progression', () => {
