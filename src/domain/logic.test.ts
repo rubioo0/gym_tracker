@@ -1470,33 +1470,33 @@ describe('logic helpers', () => {
     // Session 4 was planned as 20, user did 15 → anchor created
     const anchor = { weight: 15, resetAtSessionIndex: 4 }
 
-    // Session 5: sessionsSince=5-4=1, steps=floor(1/2)=0, weight=15
+    // Session 5: effectiveSince=max(0,5-4-1)=0, steps=floor(0/2)=0, weight=15
     const s5 = getPlannedExercise(exercise, 5, {
       latestCompletedActualWeight: 15,
       baselineAnchor: anchor,
     })
     expect(s5.plannedWeight).toBe(15)
 
-    // Session 6: sessionsSince=6-4=2, steps=floor(2/2)=1, weight=15+5=20
+    // Session 6: effectiveSince=max(0,6-4-1)=1, steps=floor(1/2)=0, weight=15 (hold for full cycle)
     const s6 = getPlannedExercise(exercise, 6, {
       latestCompletedActualWeight: 15,
       baselineAnchor: anchor,
     })
-    expect(s6.plannedWeight).toBe(20)
+    expect(s6.plannedWeight).toBe(15)
 
-    // Session 7: sessionsSince=7-4=3, steps=floor(3/2)=1, weight=20
+    // Session 7: effectiveSince=max(0,7-4-1)=2, steps=floor(2/2)=1, weight=15+5=20
     const s7 = getPlannedExercise(exercise, 7, {
-      latestCompletedActualWeight: 20,
+      latestCompletedActualWeight: 15,
       baselineAnchor: anchor,
     })
     expect(s7.plannedWeight).toBe(20)
 
-    // Session 8: sessionsSince=8-4=4, steps=floor(4/2)=2, weight=15+10=25
+    // Session 8: effectiveSince=max(0,8-4-1)=3, steps=floor(3/2)=1, weight=20
     const s8 = getPlannedExercise(exercise, 8, {
       latestCompletedActualWeight: 20,
       baselineAnchor: anchor,
     })
-    expect(s8.plannedWeight).toBe(25)
+    expect(s8.plannedWeight).toBe(20)
   })
 
   it('did more than planned: anchor resets to higher performed value and cycle restarts', () => {
@@ -1522,32 +1522,32 @@ describe('logic helpers', () => {
     // Session 2 was planned as 15, user did 20 → anchor created
     const anchor = { weight: 20, resetAtSessionIndex: 2 }
 
-    // Session 3: sessionsSince=3-2=1, steps=floor(1/2)=0, weight=20
+    // Session 3: effectiveSince=max(0,3-2-1)=0, steps=floor(0/2)=0, weight=20
     const s3 = getPlannedExercise(exercise, 3, {
       latestCompletedActualWeight: 20,
       baselineAnchor: anchor,
     })
     expect(s3.plannedWeight).toBe(20)
 
-    // Session 4: sessionsSince=4-2=2, steps=floor(2/2)=1, weight=20+5=25
+    // Session 4: effectiveSince=max(0,4-2-1)=1, steps=floor(1/2)=0, weight=20 (hold for full cycle)
     const s4 = getPlannedExercise(exercise, 4, {
       latestCompletedActualWeight: 20,
       baselineAnchor: anchor,
     })
-    expect(s4.plannedWeight).toBe(25)
+    expect(s4.plannedWeight).toBe(20)
 
-    // Session 5: sessionsSince=5-2=3, steps=floor(3/2)=1, weight=25
+    // Session 5: effectiveSince=max(0,5-2-1)=2, steps=floor(2/2)=1, weight=20+5=25
     const s5 = getPlannedExercise(exercise, 5, {
-      latestCompletedActualWeight: 25,
+      latestCompletedActualWeight: 20,
       baselineAnchor: anchor,
     })
     expect(s5.plannedWeight).toBe(25)
 
-    // Session 6: sessionsSince=6-2=4, steps=floor(4/2)=2, weight=20+10=30
+    // Session 6: effectiveSince=max(0,6-2-1)=3, steps=floor(3/2)=1, weight=25
     const s6 = getPlannedExercise(exercise, 6, {
       latestCompletedActualWeight: 25,
       baselineAnchor: anchor,
     })
-    expect(s6.plannedWeight).toBe(30)
+    expect(s6.plannedWeight).toBe(25)
   })
 })
