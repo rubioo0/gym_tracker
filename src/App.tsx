@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useReducer, useState } from 'react'
+import { useEffect, useMemo, useReducer, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import {
   clearAppState,
@@ -15,6 +15,8 @@ import {
 } from './data/csvTemplateUpsert'
 import { exportProgramTemplateToCsv } from './data/csvExport'
 import { extractCsvImportMetadata } from './data/csvImport'
+import { exportWorkoutLogsToExcel, buildExcelLogFileName } from './data/excelLogExport'
+import { importWorkoutLogsFromExcel } from './data/excelLogImport'
 import {
   buildPlannedSession,
   buildProgramCalendar,
@@ -500,6 +502,70 @@ function App() {
     })
     setSelectedRunIds([])
     setDataMessage(`Deleted ${selectedRuns.length} selected run(s).`)
+  }
+
+  function handleExportLogsExcel(): void {
+    if (state.workoutLogs.length === 0) {
+      setDataMessage('No logs to export.')
+      return
+    }
+
+    try {
+      const buffer = exportWorkoutLogsToExcel(state.workoutLogs)
+      const fileName = buildExcelLogFileName()
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      link.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 0)
+
+      setDataMessage(
+        `Exported ${state.workoutLogs.length} workout log(s) to ${fileName}`,
+      )
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown export error.'
+      setDataMessage(`Excel export failed: ${message}`)
+    }
+  }
+
+  async function handleImportLogsExcel(
+    event: ChangeEvent<HTMLInputElement>,
+  ): Promise<void> {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) {
+      return
+    }
+
+    try {
+      const buffer = await file.arrayBuffer()
+      const logs = importWorkoutLogsFromExcel(buffer)
+      if (!logs) {
+        setDataMessage(
+          'Import failed: could not parse the Excel file. Make sure it has the required columns (logId, runId, etc.).',
+        )
+        return
+      }
+
+      const approved = window.confirm(
+        `Import ${logs.length} workout log(s) from "${file.name}"? This will replace all current logs and recalculate run counters.`,
+      )
+      if (!approved) {
+        return
+      }
+
+      dispatch({ type: 'importLogs', logs })
+      setDataMessage(
+        `Imported ${logs.length} workout log(s) from ${file.name}. Run counters recalculated.`,
+      )
+    } catch {
+      setDataMessage('Failed to read the Excel file.')
+    }
   }
 
   function handleExportState(): void {
@@ -1479,6 +1545,16 @@ function App() {
         <section className="panel-grid">
           <article className="card card-wide">
             <h2>History</h2>
+            <div className="action-row">
+              <button
+                type="button"
+                onClick={handleExportLogsExcel}
+                disabled={state.workoutLogs.length === 0}
+              >
+                Export History to Excel
+              </button>
+            </div>
+            {dataMessage ? <p className="note">{dataMessage}</p> : null}
             {state.workoutLogs.length === 0 ? (
               <p>No logs yet.</p>
             ) : (
@@ -1556,6 +1632,34 @@ function App() {
                     type="file"
                     accept=".json,application/json"
                     onChange={handleImportStateFileChange}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="template-group">
+              <h3>Log History Export / Import</h3>
+              <p className="muted">
+                Export your workout log history to an Excel file. Edit it externally
+                (adjust weights, dates, etc.), then re-import. Importing replaces all
+                current logs and recalculates run counters.
+              </p>
+              <div className="action-row">
+                <button
+                  type="button"
+                  onClick={handleExportLogsExcel}
+                  disabled={state.workoutLogs.length === 0}
+                >
+                  Export Logs to Excel ({state.workoutLogs.length})
+                </button>
+              </div>
+              <div className="action-row">
+                <label className="stacked-field inline-file-field">
+                  Import Logs from Excel
+                  <input
+                    type="file"
+                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    onChange={handleImportLogsExcel}
                   />
                 </label>
               </div>
