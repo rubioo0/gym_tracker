@@ -25,6 +25,7 @@ import {
   buildPlannedSession,
   buildProgramCalendar,
   getActiveRuns,
+  getRunnableRunForTemplate,
   getSuggestedRun,
   getTemplateById,
 } from './domain/logic'
@@ -33,7 +34,6 @@ import { SessionPlanPanel } from './components/session/SessionPlanPanel'
 import { ProgramCalendarView } from './components/calendar/ProgramCalendarView'
 import type {
   ExerciseDifficulty,
-  FocusRun,
   LogActivityInput,
   LogExerciseInput,
   ProgramMode,
@@ -101,22 +101,6 @@ function formatModeLabel(templates: ProgramTemplate[]): string {
   return 'Змішана'
 }
 
-function createPreviewRun(template: ProgramTemplate): FocusRun {
-  return {
-    id: `preview-${template.id}`,
-    templateId: template.id,
-    templateName: template.name,
-    mode: template.mode,
-    track: template.track,
-    focusTarget: template.focusTarget,
-    status: 'paused',
-    startedAt: '1970-01-01T00:00:00.000Z',
-    completedSessionCount: 0,
-    successfulSessionCount: 0,
-    nextSessionIndex: 0,
-  }
-}
-
 function rewriteCsvSourceFileName(csvText: string, sourceFileName: string): string {
   const replacement = `training-os-metadata,source-file-name,${sourceFileName}`
   return csvText.replace(
@@ -128,7 +112,6 @@ function rewriteCsvSourceFileName(csvText: string, sourceFileName: string): stri
 function App() {
   const [state, dispatch] = useReducer(appReducer, undefined, loadAppState)
   const [activeTab, setActiveTab] = useState<AppTab>('home')
-  const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null)
   const [importText, setImportText] = useState('')
   const [dataMessage, setDataMessage] = useState('')
   const [csvRawText, setCsvRawText] = useState('')
@@ -181,36 +164,6 @@ function App() {
 
     return buildPlannedSession(selectedRun, selectedTemplate, state.workoutLogs)
   }, [selectedRun, selectedTemplate, state.workoutLogs])
-
-  const previewTemplate = useMemo(() => {
-    if (!previewTemplateId) {
-      return null
-    }
-
-    return getTemplateById(state.programTemplates, previewTemplateId) ?? null
-  }, [previewTemplateId, state.programTemplates])
-
-  const previewRun = useMemo(() => {
-    if (!previewTemplate) {
-      return null
-    }
-
-    const existingRun = state.focusRuns
-      .filter(
-        (run) => run.templateId === previewTemplate.id && run.status !== 'archived',
-      )
-      .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))[0]
-
-    return existingRun ?? createPreviewRun(previewTemplate)
-  }, [previewTemplate, state.focusRuns])
-
-  const sessionTabPlannedSession = useMemo(() => {
-    if (!previewTemplate || !previewRun) {
-      return plannedSession
-    }
-
-    return buildPlannedSession(previewRun, previewTemplate, state.workoutLogs)
-  }, [plannedSession, previewRun, previewTemplate, state.workoutLogs])
 
   const programCalendar = useMemo(() => {
     if (!selectedRun || !selectedTemplate) {
@@ -340,12 +293,35 @@ function App() {
   )
 
   function handleTabChange(tab: AppTab): void {
-    setPreviewTemplateId(null)
     setActiveTab(tab)
   }
 
   function handleOpenTemplatePlan(templateId: string): void {
-    setPreviewTemplateId(templateId)
+    const runnableRun = getRunnableRunForTemplate(state.focusRuns, templateId)
+    if (runnableRun) {
+      dispatch({ type: 'switchRun', runId: runnableRun.id })
+      setActiveTab('session')
+      return
+    }
+
+    const template = getTemplateById(state.programTemplates, templateId)
+    if (!template) {
+      setDataMessage('Template not found.')
+      return
+    }
+
+    const approved = window.confirm(
+      `No active run exists for "${template.name}". Start one and open Session Plan?`,
+    )
+    if (!approved) {
+      return
+    }
+
+    dispatch({
+      type: 'startRun',
+      templateId: template.id,
+      now: new Date().toISOString(),
+    })
     setActiveTab('session')
   }
 
@@ -397,7 +373,6 @@ function App() {
       },
     })
 
-    setPreviewTemplateId(null)
     setActiveTab('home')
   }
 
@@ -674,7 +649,6 @@ function App() {
     }
 
     dispatch({ type: 'hydrate', payload: imported })
-    setPreviewTemplateId(null)
     setDataMessage('State imported successfully.')
   }
 
@@ -695,7 +669,6 @@ function App() {
 
       dispatch({ type: 'hydrate', payload: imported })
       setImportText(text)
-      setPreviewTemplateId(null)
       setDataMessage(`Imported backup file: ${file.name}`)
     } catch {
       setDataMessage('Failed to read backup file.')
@@ -1270,17 +1243,14 @@ function App() {
         <section className="panel-grid">
           <article className="card card-wide">
             <SessionPlanPanel
-              plannedSession={sessionTabPlannedSession}
-              activeRuns={previewTemplate ? [] : activeRuns}
-              selectedRun={previewTemplate ? null : selectedRun}
-              hasManualRunOverride={previewTemplate ? false : hasManualRunOverride}
-              previewTemplateName={previewTemplate?.name ?? null}
+              plannedSession={plannedSession}
+              activeRuns={activeRuns}
+              selectedRun={selectedRun}
+              hasManualRunOverride={hasManualRunOverride}
               onSelectRun={(runId) => {
-                setPreviewTemplateId(null)
                 dispatch({ type: 'setSelectedRun', runId })
               }}
               onResetToSuggestedRun={() => {
-                setPreviewTemplateId(null)
                 dispatch({ type: 'setSelectedRun', runId: null })
               }}
             />
