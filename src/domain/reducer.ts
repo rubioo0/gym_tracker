@@ -28,6 +28,7 @@ export type AppAction =
   | { type: 'deleteRuns'; runIds: string[] }
   | { type: 'setSelectedRun'; runId: string | null }
   | { type: 'logSession'; payload: LogSessionInput }
+  | { type: 'importLogs'; logs: WorkoutLog[] }
   | { type: 'clearAllData'; templates: ProgramTemplate[] }
 
 function canTransition(from: RunStatus, to: RunStatus): boolean {
@@ -301,6 +302,68 @@ function logSession(state: AppState, payload: LogSessionInput): AppState {
   }
 }
 
+function normalizeLogOrder(logs: WorkoutLog[]): WorkoutLog[] {
+  return [...logs].sort((a, b) => {
+    const timeA = new Date(a.completedAt).getTime()
+    const timeB = new Date(b.completedAt).getTime()
+    const safeA = Number.isNaN(timeA) ? 0 : timeA
+    const safeB = Number.isNaN(timeB) ? 0 : timeB
+    return safeB - safeA
+  })
+}
+
+function getLatestCompletedTrack(logs: WorkoutLog[]): AppState['lastCompletedTrack'] {
+  let latestTrack: AppState['lastCompletedTrack'] = null
+  let latestTimestamp = Number.NEGATIVE_INFINITY
+
+  for (const log of logs) {
+    const completedAt = new Date(log.completedAt).getTime()
+    if (Number.isNaN(completedAt)) {
+      continue
+    }
+
+    if (completedAt > latestTimestamp) {
+      latestTimestamp = completedAt
+      latestTrack = log.track
+    }
+  }
+
+  return latestTrack
+}
+
+function recalculateRunsFromLogs(
+  runs: FocusRun[],
+  templates: ProgramTemplate[],
+  logs: WorkoutLog[],
+): FocusRun[] {
+  const logsByRunId = new Map<string, WorkoutLog[]>()
+  for (const log of logs) {
+    const bucket = logsByRunId.get(log.runId)
+    if (bucket) {
+      bucket.push(log)
+    } else {
+      logsByRunId.set(log.runId, [log])
+    }
+  }
+
+  return runs.map((run) => {
+    const runLogs = logsByRunId.get(run.id) ?? []
+    const completedSessionCount = runLogs.length
+    const successfulSessionCount = runLogs.filter((log) => log.successful).length
+    const template = templates.find((candidate) => candidate.id === run.templateId)
+    const sessionCount = template?.sessions.length ?? 0
+    const nextSessionIndex =
+      sessionCount > 0 ? completedSessionCount % sessionCount : run.nextSessionIndex
+
+    return {
+      ...run,
+      completedSessionCount,
+      successfulSessionCount,
+      nextSessionIndex,
+    }
+  })
+}
+
 export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'hydrate': {
@@ -485,6 +548,22 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'logSession': {
       return logSession(state, action.payload)
+    }
+
+    case 'importLogs': {
+      const normalizedLogs = normalizeLogOrder(action.logs)
+      const recalculatedRuns = recalculateRunsFromLogs(
+        state.focusRuns,
+        state.programTemplates,
+        normalizedLogs,
+      )
+
+      return {
+        ...state,
+        focusRuns: recalculatedRuns,
+        workoutLogs: normalizedLogs,
+        lastCompletedTrack: getLatestCompletedTrack(normalizedLogs),
+      }
     }
 
     case 'clearAllData': {
