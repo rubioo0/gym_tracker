@@ -956,3 +956,22 @@ export function getSuggestedRun(state: AppState): FocusRun | null {
     activeRuns.find((run) => run.track === suggestedTrack) ?? activeRuns[0] ?? null
   )
 }
+
+export function getRunnableRunForTemplate(
+  runs: FocusRun[],
+  templateId: string,
+): FocusRun | null {
+  const activeRuns = runs
+    .filter((run) => run.templateId === templateId && run.status === 'active')
+    .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))
+
+  if (activeRuns[0]) {
+    return activeRuns[0]
+  }
+
+  const pausedRuns = runs
+    .filter((run) => run.templateId === templateId && run.status === 'paused')
+    .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))
+
+  return pausedRuns[0] ?? null
+}

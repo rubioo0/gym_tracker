@@ -3,6 +3,7 @@ import {
   buildPlannedSession,
   buildProgramCalendar,
   getPlannedExercise,
+  getRunnableRunForTemplate,
   getSuggestedTrack,
   getSessionByIndex,
 } from './logic'
@@ -905,6 +906,134 @@ describe('logic helpers', () => {
 
     expect(getSessionByIndex(template, 2).id).toBe('s1')
     expect(getSessionByIndex(template, -1).id).toBe('s2')
+  })
+
+  it('resolves runnable run for a template preferring active over paused', () => {
+    const runs: FocusRun[] = [
+      {
+        id: 'paused-newer',
+        templateId: 'template-1',
+        templateName: 'Template 1',
+        mode: 'main',
+        track: 'upper',
+        focusTarget: 'arms',
+        status: 'paused',
+        startedAt: '2026-04-12T10:00:00.000Z',
+        completedSessionCount: 1,
+        successfulSessionCount: 1,
+        nextSessionIndex: 1,
+      },
+      {
+        id: 'active-older',
+        templateId: 'template-1',
+        templateName: 'Template 1',
+        mode: 'main',
+        track: 'upper',
+        focusTarget: 'arms',
+        status: 'active',
+        startedAt: '2026-04-10T10:00:00.000Z',
+        completedSessionCount: 2,
+        successfulSessionCount: 2,
+        nextSessionIndex: 0,
+      },
+      {
+        id: 'active-newer',
+        templateId: 'template-1',
+        templateName: 'Template 1',
+        mode: 'main',
+        track: 'upper',
+        focusTarget: 'arms',
+        status: 'active',
+        startedAt: '2026-04-14T10:00:00.000Z',
+        completedSessionCount: 0,
+        successfulSessionCount: 0,
+        nextSessionIndex: 0,
+      },
+    ]
+
+    const resolved = getRunnableRunForTemplate(runs, 'template-1')
+    expect(resolved?.id).toBe('active-newer')
+  })
+
+  it('falls back to newest paused run when no active run exists', () => {
+    const runs: FocusRun[] = [
+      {
+        id: 'paused-older',
+        templateId: 'template-1',
+        templateName: 'Template 1',
+        mode: 'main',
+        track: 'upper',
+        focusTarget: 'arms',
+        status: 'paused',
+        startedAt: '2026-04-10T10:00:00.000Z',
+        completedSessionCount: 1,
+        successfulSessionCount: 1,
+        nextSessionIndex: 1,
+      },
+      {
+        id: 'paused-newer',
+        templateId: 'template-1',
+        templateName: 'Template 1',
+        mode: 'main',
+        track: 'upper',
+        focusTarget: 'arms',
+        status: 'paused',
+        startedAt: '2026-04-12T10:00:00.000Z',
+        completedSessionCount: 2,
+        successfulSessionCount: 2,
+        nextSessionIndex: 0,
+      },
+      {
+        id: 'other-template-active',
+        templateId: 'template-2',
+        templateName: 'Template 2',
+        mode: 'main',
+        track: 'lower',
+        focusTarget: 'legs',
+        status: 'active',
+        startedAt: '2026-04-13T10:00:00.000Z',
+        completedSessionCount: 0,
+        successfulSessionCount: 0,
+        nextSessionIndex: 0,
+      },
+    ]
+
+    const resolved = getRunnableRunForTemplate(runs, 'template-1')
+    expect(resolved?.id).toBe('paused-newer')
+  })
+
+  it('returns null when template has no active or paused runs', () => {
+    const runs: FocusRun[] = [
+      {
+        id: 'completed-run',
+        templateId: 'template-1',
+        templateName: 'Template 1',
+        mode: 'main',
+        track: 'upper',
+        focusTarget: 'arms',
+        status: 'completed',
+        startedAt: '2026-04-10T10:00:00.000Z',
+        completedSessionCount: 16,
+        successfulSessionCount: 16,
+        nextSessionIndex: 0,
+      },
+      {
+        id: 'archived-run',
+        templateId: 'template-1',
+        templateName: 'Template 1',
+        mode: 'main',
+        track: 'upper',
+        focusTarget: 'arms',
+        status: 'archived',
+        startedAt: '2026-04-01T10:00:00.000Z',
+        completedSessionCount: 8,
+        successfulSessionCount: 7,
+        nextSessionIndex: 0,
+      },
+    ]
+
+    const resolved = getRunnableRunForTemplate(runs, 'template-1')
+    expect(resolved).toBeNull()
   })
 
   it('builds calendar with projected dates for unlogged sessions', () => {
