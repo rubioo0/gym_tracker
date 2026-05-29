@@ -32,6 +32,7 @@ import {
 import { appReducer } from './domain/reducer'
 import { SessionPlanPanel } from './components/session/SessionPlanPanel'
 import { ProgramCalendarView } from './components/calendar/ProgramCalendarView'
+import { StatsTab } from './components/stats/StatsTab'
 import type {
   ExerciseDifficulty,
   LogActivityInput,
@@ -43,7 +44,7 @@ import type {
 } from './domain/types'
 import './App.css'
 
-type AppTab = 'home' | 'runs' | 'session' | 'log' | 'history' | 'calendar' | 'data'
+type AppTab = 'home' | 'runs' | 'session' | 'log' | 'history' | 'calendar' | 'stats' | 'data'
 
 const tabs: { id: AppTab; label: string }[] = [
   { id: 'home', label: 'Головна' },
@@ -52,6 +53,7 @@ const tabs: { id: AppTab; label: string }[] = [
   { id: 'log', label: 'Завершити / Логування' },
   { id: 'history', label: 'Історія' },
   { id: 'calendar', label: 'Календар' },
+  { id: 'stats', label: 'Статистика' },
   { id: 'data', label: 'Дані' },
 ]
 
@@ -1615,6 +1617,14 @@ function App() {
           onExportExcel={handleExportCalendarExcel}
           exportDisabled={!programCalendar}
           exportMessage={dataMessage}
+        />
+      )}
+
+      {activeTab === 'stats' && (
+        <StatsTab
+          workoutLogs={state.workoutLogs}
+          focusRuns={state.focusRuns}
+          programTemplates={state.programTemplates}
         />
       )}
 
