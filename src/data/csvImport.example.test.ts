@@ -1,10 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { importProgramTemplateFromCsv } from './csvImport'
+
+// Resolve the example CSV relative to the repo root regardless of CWD
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+const csvPath = path.join(repoRoot, 'IMPORT_TEMPLATE_EXAMPLE.csv')
 
 describe('Import Example CSV Template', () => {
   it('imports example CSV with all metadata', () => {
-    const csvPath = '../training-os/IMPORT_TEMPLATE_EXAMPLE.csv'
     const csvContent = fs.readFileSync(csvPath, 'utf-8')
 
     const template = importProgramTemplateFromCsv(csvContent, {
@@ -23,7 +28,6 @@ describe('Import Example CSV Template', () => {
   })
 
   it('imports all 8 exercises from example CSV', () => {
-    const csvPath = '../training-os/IMPORT_TEMPLATE_EXAMPLE.csv'
     const csvContent = fs.readFileSync(csvPath, 'utf-8')
 
     const template = importProgramTemplateFromCsv(csvContent)

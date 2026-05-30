@@ -1,9 +1,16 @@
 import { test, expect } from 'vitest'
 import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { importProgramTemplateFromCsv } from './csvImport'
 
-test('imports Book 2 CSV correctly', () => {
-  const csvPath = '../Book 2(РУКИ (2)).csv'
+// This file is a local user CSV that is not committed to the repo.
+// The test is skipped automatically when the file does not exist (e.g. in CI).
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+const csvPath = path.join(repoRoot, 'Book 2(РУКИ (2)).csv')
+const fileExists = fs.existsSync(csvPath)
+
+test.skipIf(!fileExists)('imports Book 2 CSV correctly', () => {
   const csvContent = fs.readFileSync(csvPath, 'utf-8')
 
   const template = importProgramTemplateFromCsv(csvContent, {

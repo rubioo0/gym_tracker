@@ -1952,8 +1952,10 @@ describe('logic helpers', () => {
     expect(nextCalendarSession.sessionId).toBe(planned.session.id)
     expect(plannedExercise?.plannedWeight).toBe(42.5)
     expect(calendarExercise?.plannedWeight).toBe(plannedExercise?.plannedWeight)
-    expect(plannedExercise?.maxPlannedWeight).toBe(55)
-    expect(plannedExercise?.maxWeightExplanation).toContain('= 55 kg')
+    // Max projected at session 15 from latestActual anchor at session 0:
+    // steps = floor(15/2) = 7, maxWeight = 40 + 7*2.5 = 57.5
+    expect(plannedExercise?.maxPlannedWeight).toBe(57.5)
+    expect(plannedExercise?.maxWeightExplanation).toContain('= 57.5 kg')
   })
 
   it('builds cycle status and recent history for planned exercises', () => {
