@@ -201,12 +201,17 @@ export function SessionExerciseDetailsModal({
                   </p>
                 ) : null}
                 {exercise.recentExerciseHistory && exercise.recentExerciseHistory.length > 0 ? (
-                  <div className="exercise-card-history">
-                    {exercise.recentExerciseHistory.slice(0, 3).map((entry) => (
-                      <span key={`${exercise.id}-modal-${entry.completedAt}`} className="exercise-history-chip">
-                        {formatExerciseHistoryEntry(entry)}
-                      </span>
-                    ))}
+                  <div>
+                    <p className="muted exercise-history-label">
+                      History ({exercise.recentExerciseHistory.length} session{exercise.recentExerciseHistory.length !== 1 ? 's' : ''})
+                    </p>
+                    <div className="exercise-history-all">
+                      {exercise.recentExerciseHistory.map((entry) => (
+                        <span key={`${exercise.id}-modal-${entry.completedAt}`} className="exercise-history-chip">
+                          {formatExerciseHistoryEntry(entry)}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
               </section>

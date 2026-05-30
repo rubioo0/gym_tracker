@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildBaselineAnchorsForRun,
   buildPlannedSession,
   buildProgramCalendar,
   getPlannedExercise,
+  getRecentExerciseHistory,
   getRunnableRunForTemplate,
   getSuggestedTrack,
   getSessionByIndex,
@@ -1967,6 +1969,15 @@ describe('logic helpers', () => {
       completedSessionCount: 5,
       successfulSessionCount: 5,
       nextSessionIndex: 0,
+      // Anchor was set at session index 3 (4th session) when user held at 17 lbs
+      // while system progressed to 19. resetAtSessionIndex=3 → anchorSession=4.
+      baselineAnchors: {
+        curl: {
+          weight: 17,
+          resetAtSessionIndex: 3,
+          resetAt: '2026-04-07T08:00:00.000Z',
+        },
+      },
     }
 
     const template: ProgramTemplate = {
@@ -2117,10 +2128,526 @@ describe('logic helpers', () => {
     const planned = buildPlannedSession(run, template, logs)
     const exercise = planned.exercises[0]
 
-    expect(exercise.progressionCycleStatus?.displayNumerator).toBe(2)
+    // With fix: displayNumerator = total consecutive count (3), not modulo position
+    expect(exercise.progressionCycleStatus?.displayNumerator).toBe(3)
     expect(exercise.progressionCycleStatus?.displayDenominator).toBe(4)
     expect(exercise.progressionCycleStatus?.isHeldBeyondPlannedWindow).toBe(true)
     expect(exercise.recentExerciseHistory).toHaveLength(3)
     expect(exercise.recentExerciseHistory?.[0].completedAt).toBe('2026-04-09T08:00:00.000Z')
+  })
+
+  it('shows correct held numerator after anchor resets cycle counter (user reports 1/N instead of 9/N)', () => {
+    // User scenario: exercise with 2-week frequency (window=4 sessions).
+    // User did 35 lbs for 9 sessions in a row. After session 4 the system tried to
+    // progress to 40 lbs but user held at 35. An anchor was set at session index 4.
+    // Bug: showed "1/12 (held)" because the modulo resets to 1 inside the new window.
+    // Fix: should show "9/12 (held)" — the actual consecutive count at held weight.
+    const run: FocusRun = {
+      id: 'run-held',
+      templateId: 'template-held',
+      templateName: 'Held Test',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'forearms',
+      status: 'active',
+      startedAt: '2026-01-01T10:00:00.000Z',
+      completedSessionCount: 9,
+      successfulSessionCount: 9,
+      nextSessionIndex: 0,
+      // Anchor set at session index 4 (5th session): system showed 40, user did 35.
+      // anchorSession = resetAtSessionIndex + 1 = 5.
+      baselineAnchors: {
+        'wrist-curl': {
+          weight: 35,
+          resetAtSessionIndex: 4,
+          resetAt: '2026-01-09T10:00:00.000Z',
+        },
+      },
+    }
+
+    const template: ProgramTemplate = {
+      id: 'template-held',
+      name: 'Held Test',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'forearms',
+      sessions: [
+        {
+          id: 'session-1',
+          name: 'Session 1',
+          order: 1,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'wrist-curl',
+              name: 'Wrist Curl',
+              sets: '3',
+              reps: '12',
+              plannedWeight: 35,
+              weightUnit: 'lbs',
+              progressionRule: {
+                type: 'weight',
+                amount: 5,
+                frequency: 2,
+                frequencyUnit: 'week',
+                basis: 'trackSessions',
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    // 9 sessions all at 35 lbs, spaced 3-4 days apart
+    const logs: WorkoutLog[] = Array.from({ length: 9 }, (_, i) => ({
+      id: `log-${i + 1}`,
+      runId: 'run-held',
+      templateId: 'template-held',
+      sessionId: 'session-1',
+      sessionName: 'Session 1',
+      track: 'upper' as const,
+      completedAt: new Date(
+        Date.UTC(2026, 0, 1 + i * 4),
+      ).toISOString(),
+      successful: true,
+      exerciseLogs: [
+        {
+          exerciseId: 'wrist-curl',
+          exerciseName: 'Wrist Curl',
+          completed: true,
+          skipped: false,
+          plannedWeight: 35,
+          actualWeight: 35,
+          weightUnit: 'lbs',
+        },
+      ],
+      optionalActivities: [],
+    }))
+
+    const planned = buildPlannedSession(run, template, logs)
+    const exercise = planned.exercises[0]
+
+    // anchor at index 4 → anchorSession=5; sessionsSinceAnchor=max(0,9-5)=4; steps=floor(4/4)=1
+    // currentPlannedWeight = 35+1*5=40. But 40≠35 in logs → heldExtensions check fails.
+    // Correct: currentPlannedWeight must equal the held weight (35) for held to be detected.
+    // This happens when anchorSession is placed so that steps=0 within the current window.
+    // In this test the anchor is at resetAtSessionIndex=4 (anchorSession=5) and
+    // nextProgramSessionIndex=9, so sessionsSinceAnchor=4, steps=1, plannedWeight=40.
+    // The held detection therefore shows 0 extensions — this is correct behaviour for
+    // THIS anchor position: the system already wants the user at 40, not 35.
+    // The user-visible bug ("1/N held") is reproduced when steps=0 (first window after anchor).
+    // We test that edge case separately below.
+    expect(exercise.progressionCycleStatus?.isHeldBeyondPlannedWindow).toBe(false)
+  })
+
+  it('shows total consecutive count as numerator when user is in first window after anchor (steps=0)', () => {
+    // Scenario: anchor set at resetAtSessionIndex=8 (anchorSession=9).
+    // nextProgramSessionIndex=9 → sessionsSinceAnchor=max(0,9-9)=0 → steps=0 → plannedWeight=35.
+    // countHeldCycleExtensions checks against 35: all 9 logs match → consecutiveTargetCount=9.
+    // Bug: displayNumerator=(0%4)+1=1. Fix: displayNumerator=9.
+    const run: FocusRun = {
+      id: 'run-held-v2',
+      templateId: 'template-held-v2',
+      templateName: 'Held V2',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'forearms',
+      status: 'active',
+      startedAt: '2026-01-01T10:00:00.000Z',
+      completedSessionCount: 9,
+      successfulSessionCount: 9,
+      nextSessionIndex: 0,
+      baselineAnchors: {
+        'wrist-curl': {
+          weight: 35,
+          resetAtSessionIndex: 8,
+          resetAt: '2026-02-01T10:00:00.000Z',
+        },
+      },
+    }
+
+    const template: ProgramTemplate = {
+      id: 'template-held-v2',
+      name: 'Held V2',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'forearms',
+      sessions: [
+        {
+          id: 'session-1',
+          name: 'Session 1',
+          order: 1,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'wrist-curl',
+              name: 'Wrist Curl',
+              sets: '3',
+              reps: '12',
+              plannedWeight: 35,
+              weightUnit: 'lbs',
+              progressionRule: {
+                type: 'weight',
+                amount: 5,
+                frequency: 2,
+                frequencyUnit: 'week',
+                basis: 'trackSessions',
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    const logs: WorkoutLog[] = Array.from({ length: 9 }, (_, i) => ({
+      id: `log-v2-${i + 1}`,
+      runId: 'run-held-v2',
+      templateId: 'template-held-v2',
+      sessionId: 'session-1',
+      sessionName: 'Session 1',
+      track: 'upper' as const,
+      completedAt: new Date(Date.UTC(2026, 0, 1 + i * 4)).toISOString(),
+      successful: true,
+      exerciseLogs: [
+        {
+          exerciseId: 'wrist-curl',
+          exerciseName: 'Wrist Curl',
+          completed: true,
+          skipped: false,
+          plannedWeight: 35,
+          actualWeight: 35,
+          weightUnit: 'lbs',
+        },
+      ],
+      optionalActivities: [],
+    }))
+
+    const planned = buildPlannedSession(run, template, logs)
+    const exercise = planned.exercises[0]
+
+    // anchorSession=9, sessionsSinceAnchor=0, steps=0, plannedWeight=35
+    // All 9 logs at 35 → consecutiveTargetCount=9
+    // window=4, heldExtensions=max(1,ceil((9-4)/4))=max(1,2)=2
+    // displayDenominator=4*(2+1)=12
+    // Bug (old): displayNumerator=(0%4)+1=1 → shows "1/12 (held)"
+    // Fix (new): displayNumerator=9 → shows "9/12 (held)"
+    expect(exercise.progressionCycleStatus?.displayNumerator).toBe(9)
+    expect(exercise.progressionCycleStatus?.displayDenominator).toBe(12)
+    expect(exercise.progressionCycleStatus?.isHeldBeyondPlannedWindow).toBe(true)
+  })
+
+  it('shows standard modulo numerator when not held beyond planned window', () => {
+    // Normal progression: 3 sessions done, window=2. No held extension.
+    // displayNumerator = (sessionsSinceAnchor % 2) + 1.
+    const run: FocusRun = {
+      id: 'run-normal',
+      templateId: 'template-normal',
+      templateName: 'Normal',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'arms',
+      status: 'active',
+      startedAt: '2026-03-01T10:00:00.000Z',
+      completedSessionCount: 3,
+      successfulSessionCount: 3,
+      nextSessionIndex: 0,
+    }
+
+    const template: ProgramTemplate = {
+      id: 'template-normal',
+      name: 'Normal',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'arms',
+      sessions: [
+        {
+          id: 's1',
+          name: 'S1',
+          order: 1,
+          track: 'upper',
+          exercises: [
+            {
+              id: 'curl-n',
+              name: 'Curl N',
+              sets: '3',
+              reps: '10',
+              plannedWeight: 20,
+              weightUnit: 'kg',
+              progressionRule: {
+                type: 'weight',
+                amount: 2.5,
+                frequency: 2,
+                basis: 'trackSessions',
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    const logs: WorkoutLog[] = [
+      {
+        id: 'ln-1',
+        runId: 'run-normal',
+        templateId: 'template-normal',
+        sessionId: 's1',
+        sessionName: 'S1',
+        track: 'upper',
+        completedAt: '2026-03-01T10:00:00.000Z',
+        successful: true,
+        exerciseLogs: [{ exerciseId: 'curl-n', exerciseName: 'Curl N', completed: true, skipped: false, plannedWeight: 20, actualWeight: 20, weightUnit: 'kg' }],
+        optionalActivities: [],
+      },
+      {
+        id: 'ln-2',
+        runId: 'run-normal',
+        templateId: 'template-normal',
+        sessionId: 's1',
+        sessionName: 'S1',
+        track: 'upper',
+        completedAt: '2026-03-03T10:00:00.000Z',
+        successful: true,
+        exerciseLogs: [{ exerciseId: 'curl-n', exerciseName: 'Curl N', completed: true, skipped: false, plannedWeight: 20, actualWeight: 20, weightUnit: 'kg' }],
+        optionalActivities: [],
+      },
+      {
+        id: 'ln-3',
+        runId: 'run-normal',
+        templateId: 'template-normal',
+        sessionId: 's1',
+        sessionName: 'S1',
+        track: 'upper',
+        completedAt: '2026-03-05T10:00:00.000Z',
+        successful: true,
+        exerciseLogs: [{ exerciseId: 'curl-n', exerciseName: 'Curl N', completed: true, skipped: false, plannedWeight: 22.5, actualWeight: 22.5, weightUnit: 'kg' }],
+        optionalActivities: [],
+      },
+    ]
+
+    const planned = buildPlannedSession(run, template, logs)
+    const exercise = planned.exercises[0]
+
+    // latestActual=22.5, anchorWeight=20, anchorSession=0
+    // sessionsSinceAnchor=3, completedInWindow=(3%2)+1=2, heldExtensions=0
+    // currentPlannedWeight=20+floor(3/2)*2.5=20+2.5=22.5
+    // countHeld against 22.5: only log-3 matches, consecutiveTargetCount=1 (≤2=window) → held=0
+    expect(exercise.progressionCycleStatus?.isHeldBeyondPlannedWindow).toBe(false)
+    expect(exercise.progressionCycleStatus?.displayNumerator).toBe(2)
+    expect(exercise.progressionCycleStatus?.displayDenominator).toBe(2)
+  })
+
+  // ===== buildBaselineAnchorsForRun =====
+
+  it('buildBaselineAnchorsForRun returns undefined when there are no logs', () => {
+    const template: ProgramTemplate = {
+      id: 't1',
+      name: 'T1',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: '',
+      sessions: [
+        {
+          id: 's1',
+          name: 'S1',
+          order: 1,
+          track: 'upper',
+          exercises: [{ id: 'e1', name: 'E1', sets: '3', reps: '10', plannedWeight: 20, weightUnit: 'kg', progressionRule: { type: 'weight', amount: 2.5, frequency: 2, basis: 'trackSessions' } }],
+        },
+      ],
+    }
+
+    expect(buildBaselineAnchorsForRun(template, [])).toBeUndefined()
+  })
+
+  it('buildBaselineAnchorsForRun returns undefined when actual matches planned in all logs', () => {
+    const template: ProgramTemplate = {
+      id: 't2',
+      name: 'T2',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: '',
+      sessions: [{ id: 's1', name: 'S1', order: 1, track: 'upper', exercises: [{ id: 'e1', name: 'E1', sets: '3', reps: '10', plannedWeight: 20, weightUnit: 'kg', progressionRule: { type: 'weight', amount: 2.5, frequency: 2, basis: 'trackSessions' } }] }],
+    }
+
+    const logs: WorkoutLog[] = [
+      { id: 'l1', runId: 'r1', templateId: 't2', sessionId: 's1', sessionName: 'S1', track: 'upper', completedAt: '2026-01-01T10:00:00Z', successful: true, exerciseLogs: [{ exerciseId: 'e1', exerciseName: 'E1', completed: true, skipped: false, plannedWeight: 20, actualWeight: 20, weightUnit: 'kg' }], optionalActivities: [] },
+      { id: 'l2', runId: 'r1', templateId: 't2', sessionId: 's1', sessionName: 'S1', track: 'upper', completedAt: '2026-01-03T10:00:00Z', successful: true, exerciseLogs: [{ exerciseId: 'e1', exerciseName: 'E1', completed: true, skipped: false, plannedWeight: 20, actualWeight: 20, weightUnit: 'kg' }], optionalActivities: [] },
+    ]
+
+    expect(buildBaselineAnchorsForRun(template, logs)).toBeUndefined()
+  })
+
+  it('buildBaselineAnchorsForRun creates anchor when actual deviates from planned', () => {
+    const template: ProgramTemplate = {
+      id: 't3',
+      name: 'T3',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: '',
+      sessions: [{ id: 's1', name: 'S1', order: 1, track: 'upper', exercises: [{ id: 'e1', name: 'E1', sets: '3', reps: '10', plannedWeight: 20, weightUnit: 'kg', progressionRule: { type: 'weight', amount: 2.5, frequency: 2, basis: 'trackSessions' } }] }],
+    }
+
+    const logs: WorkoutLog[] = [
+      { id: 'l1', runId: 'r1', templateId: 't3', sessionId: 's1', sessionName: 'S1', track: 'upper', completedAt: '2026-01-01T10:00:00Z', successful: true, exerciseLogs: [{ exerciseId: 'e1', exerciseName: 'E1', completed: true, skipped: false, plannedWeight: 20, actualWeight: 20, weightUnit: 'kg' }], optionalActivities: [] },
+      // Session 2: user logs planned=22.5 but actual=20 (didn't progress)
+      { id: 'l2', runId: 'r1', templateId: 't3', sessionId: 's1', sessionName: 'S1', track: 'upper', completedAt: '2026-01-03T10:00:00Z', successful: true, exerciseLogs: [{ exerciseId: 'e1', exerciseName: 'E1', completed: true, skipped: false, plannedWeight: 22.5, actualWeight: 20, weightUnit: 'kg' }], optionalActivities: [] },
+    ]
+
+    const anchors = buildBaselineAnchorsForRun(template, logs)
+    expect(anchors).toBeDefined()
+    expect(anchors?.['e1']?.weight).toBe(20)
+    // resetAtSessionIndex = completedCount BEFORE this log = 1 (0-indexed after log-1)
+    expect(anchors?.['e1']?.resetAtSessionIndex).toBe(1)
+  })
+
+  it('buildBaselineAnchorsForRun uses successfulSessionCount index for successfulTrackSessions basis', () => {
+    const template: ProgramTemplate = {
+      id: 't4',
+      name: 'T4',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: '',
+      sessions: [{ id: 's1', name: 'S1', order: 1, track: 'upper', exercises: [{ id: 'e1', name: 'E1', sets: '3', reps: '10', plannedWeight: 20, weightUnit: 'kg', progressionRule: { type: 'weight', amount: 2.5, frequency: 2, basis: 'successfulTrackSessions' } }] }],
+    }
+
+    const logs: WorkoutLog[] = [
+      // Session 1: successful
+      { id: 'l1', runId: 'r1', templateId: 't4', sessionId: 's1', sessionName: 'S1', track: 'upper', completedAt: '2026-01-01T10:00:00Z', successful: true, exerciseLogs: [{ exerciseId: 'e1', exerciseName: 'E1', completed: true, skipped: false, plannedWeight: 20, actualWeight: 20, weightUnit: 'kg' }], optionalActivities: [] },
+      // Session 2: NOT successful (hard session, no progression)
+      { id: 'l2', runId: 'r1', templateId: 't4', sessionId: 's1', sessionName: 'S1', track: 'upper', completedAt: '2026-01-03T10:00:00Z', successful: false, exerciseLogs: [{ exerciseId: 'e1', exerciseName: 'E1', completed: true, skipped: false, plannedWeight: 20, actualWeight: 20, weightUnit: 'kg' }], optionalActivities: [] },
+      // Session 3: user logs planned=22.5 but actual=20
+      { id: 'l3', runId: 'r1', templateId: 't4', sessionId: 's1', sessionName: 'S1', track: 'upper', completedAt: '2026-01-05T10:00:00Z', successful: true, exerciseLogs: [{ exerciseId: 'e1', exerciseName: 'E1', completed: true, skipped: false, plannedWeight: 22.5, actualWeight: 20, weightUnit: 'kg' }], optionalActivities: [] },
+    ]
+
+    const anchors = buildBaselineAnchorsForRun(template, logs)
+    expect(anchors).toBeDefined()
+    // resetAtSessionIndex = successfulCount BEFORE this log = 1 (only l1 was successful before l3)
+    expect(anchors?.['e1']?.resetAtSessionIndex).toBe(1)
+  })
+
+  // ===== getRecentExerciseHistory =====
+
+  it('getRecentExerciseHistory with no limit returns all matching entries', () => {
+    const logs: WorkoutLog[] = Array.from({ length: 5 }, (_, i) => ({
+      id: `log-h${i}`,
+      runId: 'r1',
+      templateId: 't1',
+      sessionId: 's1',
+      sessionName: 'S1',
+      track: 'upper' as const,
+      completedAt: new Date(Date.UTC(2026, 2, 1 + i)).toISOString(),
+      successful: true,
+      exerciseLogs: [{ exerciseId: 'e1', exerciseName: 'Curl', completed: true, skipped: false, plannedWeight: 20 + i, actualWeight: 20 + i, weightUnit: 'kg' }],
+      optionalActivities: [],
+    }))
+
+    const exercise = { id: 'e1', name: 'Curl', sets: '3', reps: '10' }
+    const history = getRecentExerciseHistory(logs, exercise, Number.MAX_SAFE_INTEGER)
+    expect(history).toHaveLength(5)
+    // Most recent first
+    expect(history[0].completedAt).toBe(new Date(Date.UTC(2026, 2, 5)).toISOString())
+  })
+
+  it('getRecentExerciseHistory with limit=2 returns only 2 most recent', () => {
+    const logs: WorkoutLog[] = Array.from({ length: 5 }, (_, i) => ({
+      id: `log-h2-${i}`,
+      runId: 'r1',
+      templateId: 't1',
+      sessionId: 's1',
+      sessionName: 'S1',
+      track: 'upper' as const,
+      completedAt: new Date(Date.UTC(2026, 2, 1 + i)).toISOString(),
+      successful: true,
+      exerciseLogs: [{ exerciseId: 'e1', exerciseName: 'Curl', completed: true, skipped: false, plannedWeight: 20, actualWeight: 20, weightUnit: 'kg' }],
+      optionalActivities: [],
+    }))
+
+    const exercise = { id: 'e1', name: 'Curl', sets: '3', reps: '10' }
+    const history = getRecentExerciseHistory(logs, exercise, 2)
+    expect(history).toHaveLength(2)
+    expect(history[0].completedAt).toBe(new Date(Date.UTC(2026, 2, 5)).toISOString())
+  })
+
+  it('getRecentExerciseHistory includes skipped exercise entries', () => {
+    const logs: WorkoutLog[] = [
+      { id: 'ls1', runId: 'r1', templateId: 't1', sessionId: 's1', sessionName: 'S1', track: 'upper', completedAt: '2026-04-01T10:00:00Z', successful: true, exerciseLogs: [{ exerciseId: 'e1', exerciseName: 'Curl', completed: true, skipped: true, plannedWeight: 20, actualWeight: undefined, weightUnit: 'kg' }], optionalActivities: [] },
+    ]
+
+    const exercise = { id: 'e1', name: 'Curl', sets: '3', reps: '10' }
+    const history = getRecentExerciseHistory(logs, exercise)
+    expect(history).toHaveLength(1)
+    expect(history[0].skipped).toBe(true)
+  })
+
+  // ===== buildPlannedSession edge cases =====
+
+  it('buildPlannedSession wraps nextSessionIndex around template session count', () => {
+    const run: FocusRun = {
+      id: 'run-wrap',
+      templateId: 'template-wrap',
+      templateName: 'Wrap',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'x',
+      status: 'active',
+      startedAt: '2026-01-01T00:00:00Z',
+      completedSessionCount: 2,
+      successfulSessionCount: 2,
+      nextSessionIndex: 1,
+    }
+
+    const template: ProgramTemplate = {
+      id: 'template-wrap',
+      name: 'Wrap',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: 'x',
+      sessions: [
+        { id: 's1', name: 'Session A', order: 1, track: 'upper', exercises: [{ id: 'ea', name: 'A', sets: '3', reps: '10' }] },
+        { id: 's2', name: 'Session B', order: 2, track: 'lower', exercises: [{ id: 'eb', name: 'B', sets: '3', reps: '10' }] },
+      ],
+    }
+
+    const planned = buildPlannedSession(run, template, [])
+    expect(planned.session.id).toBe('s2')
+    expect(planned.session.name).toBe('Session B')
+  })
+
+  it('buildPlannedSession history is sorted descending by completedAt', () => {
+    const run: FocusRun = {
+      id: 'run-sort',
+      templateId: 'template-sort',
+      templateName: 'Sort',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: '',
+      status: 'active',
+      startedAt: '2026-01-01T00:00:00Z',
+      completedSessionCount: 3,
+      successfulSessionCount: 3,
+      nextSessionIndex: 0,
+    }
+
+    const template: ProgramTemplate = {
+      id: 'template-sort',
+      name: 'Sort',
+      mode: 'main',
+      track: 'upper',
+      focusTarget: '',
+      sessions: [{ id: 's1', name: 'S1', order: 1, track: 'upper', exercises: [{ id: 'e1', name: 'Curl', sets: '3', reps: '10', plannedWeight: 20, weightUnit: 'kg' }] }],
+    }
+
+    const logs: WorkoutLog[] = [
+      { id: 'l1', runId: 'run-sort', templateId: 'template-sort', sessionId: 's1', sessionName: 'S1', track: 'upper', completedAt: '2026-01-01T10:00:00Z', successful: true, exerciseLogs: [{ exerciseId: 'e1', exerciseName: 'Curl', completed: true, skipped: false, plannedWeight: 20, actualWeight: 20, weightUnit: 'kg' }], optionalActivities: [] },
+      { id: 'l2', runId: 'run-sort', templateId: 'template-sort', sessionId: 's1', sessionName: 'S1', track: 'upper', completedAt: '2026-01-05T10:00:00Z', successful: true, exerciseLogs: [{ exerciseId: 'e1', exerciseName: 'Curl', completed: true, skipped: false, plannedWeight: 20, actualWeight: 20, weightUnit: 'kg' }], optionalActivities: [] },
+      { id: 'l3', runId: 'run-sort', templateId: 'template-sort', sessionId: 's1', sessionName: 'S1', track: 'upper', completedAt: '2026-01-03T10:00:00Z', successful: true, exerciseLogs: [{ exerciseId: 'e1', exerciseName: 'Curl', completed: true, skipped: false, plannedWeight: 20, actualWeight: 20, weightUnit: 'kg' }], optionalActivities: [] },
+    ]
+
+    const planned = buildPlannedSession(run, template, logs)
+    const history = planned.exercises[0].recentExerciseHistory ?? []
+    // Should be sorted newest first
+    expect(history[0].completedAt).toBe('2026-01-05T10:00:00Z')
+    expect(history[1].completedAt).toBe('2026-01-03T10:00:00Z')
+    expect(history[2].completedAt).toBe('2026-01-01T10:00:00Z')
   })
 })

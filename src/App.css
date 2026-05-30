@@ -386,6 +386,28 @@ button:disabled:hover {
   padding: 0.14rem 0.45rem;
 }
 
+.exercise-history-more {
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 0.75rem;
+  padding: 0.14rem 0.45rem;
+}
+
+.exercise-history-all {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  max-height: 240px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.exercise-history-label {
+  font-size: 0.78rem;
+  margin-bottom: 0.4rem;
+}
+
 .exercise-card-info-wrap {
   display: inline-flex;
   align-items: center;
@@ -826,6 +848,21 @@ button:disabled:hover {
     grid-template-columns: 1fr;
   }
 
+  .exercise-card {
+    min-height: 80px;
+    padding: 0.9rem 1rem;
+  }
+
+  .exercise-card-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+
+  .exercise-chip {
+    font-size: 0.88rem;
+    padding: 0.3rem 0.6rem;
+  }
+
   .exercise-details-grid {
     grid-template-columns: 1fr;
   }
@@ -834,9 +871,63 @@ button:disabled:hover {
     grid-template-columns: 1fr;
   }
 
-  .exercise-modal {
-    padding: 0.85rem;
+  /* Modal as bottom sheet on mobile */
+  .exercise-modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
   }
+
+  .exercise-modal {
+    width: 100%;
+    max-height: 92dvh;
+    border-radius: 20px 20px 0 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    padding: 0.85rem;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    animation: modal-slide-up 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .exercise-modal-close {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Scrollable horizontal tab bar */
+  .tabs {
+    display: flex;
+    overflow-x: auto;
+    gap: 0.4rem;
+    padding-bottom: 0.2rem;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab {
+    flex: 0 0 auto;
+    min-width: 76px;
+    min-height: 44px;
+    font-size: 0.76rem;
+    padding: 0.5rem 0.5rem;
+    scroll-snap-align: start;
+    white-space: nowrap;
+  }
+}
+
+/* Prevent Safari auto-zoom on input focus (requires font-size >= 16px = 1rem) */
+input:not([type='checkbox']):not([type='radio']),
+select,
+textarea {
+  font-size: 1rem;
+}
+
+@keyframes modal-slide-up {
+  from { transform: translateY(100%); opacity: 0.6; }
+  to   { transform: translateY(0);    opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

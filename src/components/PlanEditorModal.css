@@ -1,0 +1,279 @@
+.plan-editor-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.plan-editor-sheet {
+  position: fixed;
+  inset: 0;
+  background: var(--surface-a);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+}
+
+.plan-editor-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: calc(0.75rem + env(safe-area-inset-top, 0px)) 1rem 0.75rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+
+.plan-editor-header-title {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.plan-editor-header-btn {
+  min-height: 44px;
+  min-width: 64px;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--button-bg);
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.plan-editor-save-btn {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.plan-editor-errors {
+  background: #fff0f0;
+  border-left: 3px solid #e53e3e;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 1rem 0;
+  border-radius: 6px;
+}
+
+.plan-editor-error-msg {
+  color: #c53030;
+  font-size: 0.88rem;
+  margin: 0.2rem 0;
+}
+
+.plan-editor-section {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.plan-editor-section-title {
+  font-size: 0.88rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0 0 0.75rem;
+}
+
+.plan-editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+  margin-bottom: 0.75rem;
+}
+
+.plan-editor-field > span {
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.plan-editor-field-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.plan-editor-field-inline span {
+  font-size: 0.88rem;
+}
+
+.plan-editor-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.plan-editor-row .plan-editor-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* inputs / selects / textareas inside the editor */
+.plan-editor-sheet input:not([type='checkbox']),
+.plan-editor-sheet select,
+.plan-editor-sheet textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.55rem 0.75rem;
+  font-size: 1rem; /* prevents Safari auto-zoom on focus */
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.plan-editor-sheet input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.plan-editor-sheet textarea {
+  min-height: 64px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.plan-editor-session {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+  background: var(--card);
+}
+
+.plan-editor-session-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  list-style: none;
+  min-height: 52px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.plan-editor-session-summary::-webkit-details-marker {
+  display: none;
+}
+
+.plan-editor-session-name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.plan-editor-session-count {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.plan-editor-session-body {
+  padding: 0.75rem 1rem 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.plan-editor-exercise {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+  background: var(--surface-a);
+}
+
+.plan-editor-exercise-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 0.85rem;
+  cursor: pointer;
+  list-style: none;
+  min-height: 48px;
+  font-size: 0.92rem;
+  font-weight: 500;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.plan-editor-exercise-summary::-webkit-details-marker {
+  display: none;
+}
+
+.plan-editor-exercise-summary > span:first-child {
+  flex: 1;
+}
+
+.plan-editor-exercise-body {
+  padding: 0.75rem 0.85rem 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+.plan-editor-fieldset {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.plan-editor-fieldset legend {
+  font-size: 0.8rem;
+  color: var(--muted);
+  padding: 0 0.35rem;
+  font-weight: 500;
+}
+
+.plan-editor-reorder-btns {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.plan-editor-reorder-btns button {
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-b);
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.plan-editor-reorder-btns button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.plan-editor-remove-btn {
+  background: transparent !important;
+  border-color: #e53e3e !important;
+  color: #e53e3e !important;
+}
+
+.plan-editor-add-btn {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  margin-top: 0.5rem;
+}
+
+.plan-editor-add-session-btn {
+  margin-top: 0.75rem;
+}

@@ -87,6 +87,11 @@ export function SessionExerciseCardList({
                           {formatExerciseHistoryEntry(entry)}
                         </span>
                       ))}
+                      {recentHistory.length > 3 ? (
+                        <span className="exercise-history-more">
+                          +{recentHistory.length - 3} more
+                        </span>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>

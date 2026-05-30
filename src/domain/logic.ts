@@ -305,15 +305,20 @@ function getPerformedWeightFromLog(log: ExerciseLog): number | undefined {
   return undefined
 }
 
+interface HeldCycleExtensionResult {
+  heldExtensions: number
+  consecutiveTargetCount: number
+}
+
 function countHeldCycleExtensions(
   runLogs: WorkoutLog[],
   exercise: ExerciseTemplate,
   currentPlannedWeight: number,
   plannedWindowSize: number,
   targetWeightUnit: string | undefined,
-): number {
+): HeldCycleExtensionResult {
   if (plannedWindowSize <= 0) {
-    return 0
+    return { heldExtensions: 0, consecutiveTargetCount: 0 }
   }
 
   const relevantLogs = [...runLogs].sort((a, b) => {
@@ -359,11 +364,14 @@ function countHeldCycleExtensions(
   }
 
   if (consecutiveTargetCount <= plannedWindowSize) {
-    return 0
+    return { heldExtensions: 0, consecutiveTargetCount }
   }
 
   const extraSessions = consecutiveTargetCount - plannedWindowSize
-  return Math.max(1, Math.ceil(extraSessions / plannedWindowSize))
+  return {
+    heldExtensions: Math.max(1, Math.ceil(extraSessions / plannedWindowSize)),
+    consecutiveTargetCount,
+  }
 }
 
 function buildProgressionCycleStatus(
@@ -398,7 +406,7 @@ function buildProgressionCycleStatus(
   const plannedWindowSize = effectiveFrequencySessions
   const completedInCurrentValueWindow = (sessionsSinceAnchor % plannedWindowSize) + 1
   let displayDenominator = plannedWindowSize
-  const displayNumerator = Math.min(completedInCurrentValueWindow, plannedWindowSize)
+  let displayNumerator = Math.min(completedInCurrentValueWindow, plannedWindowSize)
 
   let heldExtensions = 0
   if (
@@ -407,14 +415,18 @@ function buildProgressionCycleStatus(
     Array.isArray(runLogs) &&
     runLogs.length > 0
   ) {
-    heldExtensions = countHeldCycleExtensions(
+    const heldResult = countHeldCycleExtensions(
       runLogs,
       exercise,
       currentPlannedWeight,
       plannedWindowSize,
       exercise.weightUnit,
     )
+    heldExtensions = heldResult.heldExtensions
     displayDenominator = plannedWindowSize * (heldExtensions + 1)
+    if (heldExtensions > 0) {
+      displayNumerator = heldResult.consecutiveTargetCount
+    }
   }
 
   return {
@@ -793,7 +805,7 @@ function getExerciseProgressionCounters(
   }
 }
 
-function getRecentExerciseHistory(
+export function getRecentExerciseHistory(
   runLogs: WorkoutLog[],
   exercise: ExerciseTemplate,
   limit = 3,

@@ -33,6 +33,7 @@ import { appReducer } from './domain/reducer'
 import { SessionPlanPanel } from './components/session/SessionPlanPanel'
 import { ProgramCalendarView } from './components/calendar/ProgramCalendarView'
 import { StatsTab } from './components/stats/StatsTab'
+import { PlanEditorModal } from './components/PlanEditorModal'
 import type {
   ExerciseDifficulty,
   LogActivityInput,
@@ -129,6 +130,7 @@ function App() {
   const [csvHardOverwrite, setCsvHardOverwrite] = useState(false)
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([])
   const [selectedRunIds, setSelectedRunIds] = useState<string[]>([])
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null)
 
   const [exerciseInputs, setExerciseInputs] = useState<LogExerciseInput[]>([])
   const [activityInputs, setActivityInputs] = useState<LogActivityInput[]>([])
@@ -1032,6 +1034,12 @@ function App() {
                             </button>
                             <button
                               type="button"
+                              onClick={() => setEditingTemplateId(template.id)}
+                            >
+                              Edit Plan
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => handleExportCsvTemplate(template)}
                             >
                               Export CSV
@@ -1250,6 +1258,7 @@ function App() {
               selectedRun={selectedRun}
               hasManualRunOverride={hasManualRunOverride}
               showProgressionInsights={state.showProgressionInsights}
+              workoutLogs={state.workoutLogs}
               onSelectRun={(runId) => {
                 dispatch({ type: 'setSelectedRun', runId })
               }}
@@ -1856,6 +1865,19 @@ function App() {
         </section>
       )}
     </main>
+
+    <PlanEditorModal
+      template={
+        editingTemplateId
+          ? (getTemplateById(state.programTemplates, editingTemplateId) ?? null)
+          : null
+      }
+      onSave={(template) => {
+        dispatch({ type: 'updateProgramTemplate', template })
+        setEditingTemplateId(null)
+      }}
+      onClose={() => setEditingTemplateId(null)}
+    />
   )
 }
 

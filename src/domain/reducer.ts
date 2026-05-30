@@ -32,6 +32,7 @@ export type AppAction =
   | { type: 'logSession'; payload: LogSessionInput }
   | { type: 'importLogs'; logs: WorkoutLog[] }
   | { type: 'clearAllData'; templates: ProgramTemplate[] }
+  | { type: 'updateProgramTemplate'; template: ProgramTemplate }
 
 function canTransition(from: RunStatus, to: RunStatus): boolean {
   if (from === to) {
@@ -565,6 +566,22 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         lastCompletedTrack: null,
         selectedRunId: null,
         showProgressionInsights: false,
+      }
+    }
+
+    case 'updateProgramTemplate': {
+      if (!state.programTemplates.some((t) => t.id === action.template.id)) {
+        return state
+      }
+      const nextTemplates = state.programTemplates.map((t) =>
+        t.id === action.template.id ? action.template : t,
+      )
+      return {
+        ...state,
+        programTemplates: nextTemplates,
+        focusRuns: state.focusRuns.map((run) =>
+          synchronizeRunTemplateSnapshot(run, nextTemplates),
+        ),
       }
     }
 

@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
-import type { FocusRun, PlannedExercise, PlannedSession } from '../../domain/types'
+import type { FocusRun, PlannedExercise, PlannedSession, WorkoutLog } from '../../domain/types'
+import { getRecentExerciseHistory } from '../../domain/logic'
 import { SessionExerciseCardList } from './SessionExerciseCardList'
 import { SessionExerciseDetailsModal } from './SessionExerciseDetailsModal'
 
@@ -9,6 +10,7 @@ interface SessionPlanPanelProps {
   selectedRun: FocusRun | null
   hasManualRunOverride: boolean
   showProgressionInsights: boolean
+  workoutLogs: WorkoutLog[]
   onSelectRun: (runId: string) => void
   onResetToSuggestedRun: () => void
   onToggleProgressionInsights: (show: boolean) => void
@@ -20,6 +22,7 @@ export function SessionPlanPanel({
   selectedRun,
   hasManualRunOverride,
   showProgressionInsights,
+  workoutLogs,
   onSelectRun,
   onResetToSuggestedRun,
   onToggleProgressionInsights,
@@ -48,12 +51,19 @@ export function SessionPlanPanel({
       return null
     }
 
-    return (
+    const exercise =
       plannedSession.exercises.find(
-        (exercise) => exercise.id === effectiveDetailsExerciseId,
+        (ex) => ex.id === effectiveDetailsExerciseId,
       ) ?? null
+
+    if (!exercise) return null
+
+    const runLogs = workoutLogs.filter(
+      (log) => log.runId === plannedSession.run.id,
     )
-  }, [effectiveDetailsExerciseId, plannedSession])
+    const fullHistory = getRecentExerciseHistory(runLogs, exercise, Number.MAX_SAFE_INTEGER)
+    return { ...exercise, recentExerciseHistory: fullHistory }
+  }, [effectiveDetailsExerciseId, plannedSession, workoutLogs])
 
   const selectedExerciseOrder = useMemo(() => {
     if (!plannedSession || !effectiveSelectedExerciseId) {
