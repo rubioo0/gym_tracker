@@ -812,6 +812,7 @@ function App() {
   }
 
   return (
+    <>
     <main className="app-shell">
       <header className="topbar">
         <div>
@@ -1878,6 +1879,7 @@ function App() {
       }}
       onClose={() => setEditingTemplateId(null)}
     />
+    </>
   )
 }
 
