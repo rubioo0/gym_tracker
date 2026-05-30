@@ -258,6 +258,7 @@ export function PlanEditorModal({ template, onSave, onClose }: PlanEditorModalPr
     }
     const saved: ProgramTemplate = {
       ...template,
+      id: template.id,
       name: name.trim(),
       mode,
       track,
