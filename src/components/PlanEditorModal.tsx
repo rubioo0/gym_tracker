@@ -251,6 +251,7 @@ export function PlanEditorModal({ template, onSave, onClose }: PlanEditorModalPr
   }
 
   function handleSave() {
+    if (!template) return
     const errs = validate()
     if (errs.length > 0) {
       setErrors(errs)
