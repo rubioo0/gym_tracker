@@ -8,7 +8,7 @@
   height: 56px;
   border-radius: 50%;
   border: none;
-  background: var(--accent, #4f6ef7);
+  background: var(--accent, #0b5bd3);
   color: #fff;
   font-size: 1.4rem;
   cursor: pointer;
@@ -59,7 +59,7 @@
   z-index: 290;
   display: flex;
   flex-direction: column;
-  background: var(--surface-a, #0d1117);
+  background: var(--surface-a, #f7f9fd);
   animation: modal-slide-up 260ms cubic-bezier(0.32, 0.72, 0, 1);
   overflow: hidden;
 }
@@ -83,8 +83,8 @@
   align-items: center;
   justify-content: space-between;
   padding: calc(0.85rem + env(safe-area-inset-top, 0px)) 1rem 0.85rem;
-  background: var(--card, #161b22);
-  border-bottom: 1px solid var(--border, #2a2a3c);
+  background: var(--card, #ffffff);
+  border-bottom: 1px solid var(--border, #ccd3df);
   flex-shrink: 0;
 }
 
@@ -108,9 +108,9 @@
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  border: 1px solid var(--border, #2a2a3c);
+  border: 1px solid var(--border, #ccd3df);
   background: transparent;
-  color: var(--fg, #e6edf3);
+  color: var(--text, #1f1f24);
   font-size: 0.9rem;
   cursor: pointer;
   display: flex;
@@ -124,9 +124,9 @@
 }
 
 .ai-icon-btn--active {
-  background: var(--accent-bg, rgba(79, 110, 247, 0.15));
-  border-color: var(--accent, #4f6ef7);
-  color: var(--accent, #4f6ef7);
+  background: var(--accent-bg, #dce9ff);
+  border-color: var(--accent, #0b5bd3);
+  color: var(--accent, #0b5bd3);
 }
 
 /* ── Settings ────────────────────────────────────────────── */
@@ -154,11 +154,11 @@
 }
 
 .ai-settings-input {
-  background: var(--card, #161b22);
-  border: 1px solid var(--border, #2a2a3c);
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #ccd3df);
   border-radius: 8px;
   padding: 0.6rem 0.75rem;
-  color: var(--fg, #e6edf3);
+  color: var(--text, #1f1f24);
   font-size: 1rem;
   width: 100%;
   box-sizing: border-box;
@@ -167,11 +167,11 @@
 
 .ai-settings-input:focus {
   outline: none;
-  border-color: var(--accent, #4f6ef7);
+  border-color: var(--accent, #0b5bd3);
 }
 
 .ai-save-btn {
-  background: var(--accent, #4f6ef7);
+  background: var(--accent, #0b5bd3);
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -184,7 +184,7 @@
 }
 
 .ai-save-btn:hover {
-  background: var(--accent-hover, #3d5bda);
+  background: var(--accent-hover, #0946a8);
 }
 
 .ai-settings-hint {
@@ -195,7 +195,7 @@
 }
 
 .ai-settings-link {
-  color: var(--accent, #4f6ef7);
+  color: var(--accent, #0b5bd3);
 }
 
 /* ── Messages ────────────────────────────────────────────── */
@@ -218,16 +218,17 @@
 
 .ai-bubble--user {
   align-self: flex-end;
-  background: var(--accent, #4f6ef7);
+  background: var(--accent, #0b5bd3);
   color: #fff;
   border-bottom-right-radius: 4px;
 }
 
 .ai-bubble--model {
   align-self: flex-start;
-  background: var(--card, #161b22);
-  border: 1px solid var(--border, #2a2a3c);
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #ccd3df);
   border-bottom-left-radius: 4px;
+  color: var(--text, #1f1f24);
 }
 
 .ai-bubble-text {
@@ -281,20 +282,20 @@
 }
 
 .ai-suggestion-chip {
-  background: var(--card, #161b22);
-  border: 1px solid var(--border, #2a2a3c);
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #ccd3df);
   border-radius: 20px;
   padding: 0.45rem 0.85rem;
   font-size: 0.82rem;
-  color: var(--fg, #e6edf3);
+  color: var(--text, #1f1f24);
   cursor: pointer;
   transition: background 0.1s, border-color 0.1s;
   -webkit-tap-highlight-color: transparent;
 }
 
 .ai-suggestion-chip:hover {
-  background: var(--accent-bg, rgba(79, 110, 247, 0.12));
-  border-color: var(--accent, #4f6ef7);
+  background: var(--accent-bg, #dce9ff);
+  border-color: var(--accent, #0b5bd3);
 }
 
 /* ── Input row ───────────────────────────────────────────── */
@@ -304,17 +305,17 @@
   gap: 0.5rem;
   padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--border, #2a2a3c);
-  background: var(--card, #161b22);
+  background: var(--card, #ffffff);
   flex-shrink: 0;
 }
 
 .ai-input {
   flex: 1;
-  background: var(--surface-a, #0d1117);
-  border: 1px solid var(--border, #2a2a3c);
+  background: var(--surface-a, #f7f9fd);
+  border: 1px solid var(--border, #ccd3df);
   border-radius: 12px;
   padding: 0.6rem 0.75rem;
-  color: var(--fg, #e6edf3);
+  color: var(--text, #1f1f24);
   font-size: 1rem;
   resize: none;
   max-height: 120px;
@@ -325,7 +326,11 @@
 
 .ai-input:focus {
   outline: none;
-  border-color: var(--accent, #4f6ef7);
+  border-color: var(--accent, #0b5bd3);
+}
+
+.ai-input::placeholder {
+  color: var(--muted, #5a6272);
 }
 
 .ai-send-btn {
@@ -333,7 +338,7 @@
   height: 40px;
   border-radius: 50%;
   border: none;
-  background: var(--accent, #4f6ef7);
+  background: var(--accent, #0b5bd3);
   color: #fff;
   font-size: 1.1rem;
   font-weight: 700;
@@ -351,7 +356,7 @@
 }
 
 .ai-send-btn:not(:disabled):hover {
-  background: var(--accent-hover, #3d5bda);
+  background: var(--accent-hover, #0946a8);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -363,4 +368,78 @@
     animation: none;
     opacity: 0.6;
   }
+}
+
+/* ── Markdown inside model bubbles ───────────────────────── */
+.ai-bubble-text p { margin: 0 0 0.4em; }
+.ai-bubble-text p:last-child { margin-bottom: 0; }
+.ai-bubble-text ul, .ai-bubble-text ol { margin: 0.3em 0; padding-left: 1.4em; }
+.ai-bubble-text li { margin-bottom: 0.15em; }
+.ai-bubble-text strong { font-weight: 700; }
+.ai-bubble-text em { font-style: italic; }
+.ai-bubble-text h3, .ai-bubble-text h4 { font-size: 0.92rem; font-weight: 700; margin: 0.5em 0 0.2em; }
+.ai-bubble-text code { font-family: monospace; font-size: 0.88em; background: var(--surface-a, #f7f9fd); padding: 0.1em 0.3em; border-radius: 3px; }
+
+/* ── Weight change confirmation card ─────────────────────── */
+.ai-confirm-card {
+  margin: 0 1rem 0.75rem;
+  padding: 0.85rem 1rem;
+  background: var(--accent-bg, #dce9ff);
+  border: 1px solid var(--accent-border, #8fb2ef);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.ai-confirm-text {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+  color: var(--text, #1f1f24);
+  line-height: 1.5;
+}
+
+.ai-confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ai-confirm-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 40px;
+  transition: background 0.12s;
+}
+
+.ai-confirm-btn--apply {
+  background: var(--accent, #0b5bd3);
+  color: #fff;
+}
+
+.ai-confirm-btn--apply:hover {
+  background: var(--accent-hover, #0946a8);
+}
+
+.ai-confirm-btn--cancel {
+  background: transparent;
+  color: var(--text, #1f1f24);
+  border: 1px solid var(--border, #ccd3df);
+}
+
+.ai-confirm-btn--cancel:hover {
+  background: var(--surface-a, #f7f9fd);
+}
+
+/* Clear history link in settings */
+.ai-clear-btn {
+  background: none;
+  border: none;
+  color: #d73a49;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-align: left;
 }

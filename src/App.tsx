@@ -1880,7 +1880,7 @@ function App() {
       }}
       onClose={() => setEditingTemplateId(null)}
     />
-    <AIAssistant appState={state} />
+    <AIAssistant appState={state} onDispatch={dispatch} />
     </>
   )
 }

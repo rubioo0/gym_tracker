@@ -33,6 +33,7 @@ export type AppAction =
   | { type: 'importLogs'; logs: WorkoutLog[] }
   | { type: 'clearAllData'; templates: ProgramTemplate[] }
   | { type: 'updateProgramTemplate'; template: ProgramTemplate }
+  | { type: 'setExerciseWeightOverride'; payload: { runId: string; exerciseName: string; weight: number; unit: string } }
 
 function canTransition(from: RunStatus, to: RunStatus): boolean {
   if (from === to) {
@@ -581,6 +582,18 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         programTemplates: nextTemplates,
         focusRuns: state.focusRuns.map((run) =>
           synchronizeRunTemplateSnapshot(run, nextTemplates),
+        ),
+      }
+    }
+
+    case 'setExerciseWeightOverride': {
+      const { runId, exerciseName, weight, unit } = action.payload
+      return {
+        ...state,
+        focusRuns: state.focusRuns.map((r) =>
+          r.id === runId
+            ? { ...r, weightOverrides: { ...r.weightOverrides, [exerciseName]: { weight, unit } } }
+            : r,
         ),
       }
     }

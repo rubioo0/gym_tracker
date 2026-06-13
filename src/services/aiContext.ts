@@ -31,7 +31,7 @@ function buildActiveRunSection(
 ): string {
   const lines: string[] = []
   lines.push(
-    `### Програма: "${run.templateName}" (${formatTrack(run.track)}, ${formatMode(run.mode)})`,
+    `### Програма: "${run.templateName}" (${formatTrack(run.track)}, ${formatMode(run.mode)}) [runId: ${run.id}]`,
   )
   lines.push(
     `- Прогрес: ${run.completedSessionCount}/16 сесій (${run.successfulSessionCount} успішних)`,
@@ -58,6 +58,8 @@ function buildActiveRunSection(
       line += cycleTag
     }
     if (ex.progressionNote) line += ` | ${ex.progressionNote}`
+    const override = run.weightOverrides?.[ex.name]
+    if (override) line += ` *(вагу змінено: ${override.weight}${override.unit})*`
     lines.push(line)
   }
 

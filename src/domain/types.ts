@@ -93,6 +93,7 @@ export interface FocusRun {
   notes?: string
   pauseReason?: string
   baselineAnchors?: Record<string, BaselineAnchor> // exerciseId -> BaselineAnchor
+  weightOverrides?: Record<string, { weight: number; unit: string }> // exerciseName -> override
 }
 
 export interface ExerciseLog {

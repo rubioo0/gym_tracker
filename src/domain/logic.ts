@@ -991,6 +991,12 @@ export function buildPlannedSession(
         3,
       )
 
+      const weightOverride = run.weightOverrides?.[exercise.name]
+      if (weightOverride) {
+        plannedExercise.plannedWeight = weightOverride.weight
+        plannedExercise.weightUnit = weightOverride.unit
+      }
+
       return plannedExercise
     }),
   }

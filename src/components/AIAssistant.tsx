@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
+import ReactMarkdown from 'react-markdown'
+import type { AppAction } from '../domain/reducer'
 import type { AppState } from '../domain/types'
 import { buildFitnessSystemPrompt } from '../services/aiContext'
 import {
@@ -9,11 +11,34 @@ import {
   loadAISettings,
   saveAISettings,
 } from '../services/geminiService'
+import type { AIFunctionCall } from '../services/geminiService'
 import './AIAssistant.css'
 
 interface ChatMessage {
   role: 'user' | 'model'
   text: string
+}
+
+const HISTORY_KEY = 'gem3_chat_history'
+const HISTORY_LIMIT = 60
+
+function loadChatHistory(): ChatMessage[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY)
+    if (raw) return JSON.parse(raw) as ChatMessage[]
+  } catch {
+    // ignore
+  }
+  return []
+}
+
+function saveChatHistory(msgs: ChatMessage[]): void {
+  try {
+    const trimmed = msgs.slice(-HISTORY_LIMIT)
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(trimmed))
+  } catch {
+    // ignore storage errors
+  }
 }
 
 const SUGGESTED_PROMPTS = [
@@ -26,17 +51,18 @@ const SUGGESTED_PROMPTS = [
 
 interface AIAssistantProps {
   appState: AppState
+  onDispatch: (action: AppAction) => void
 }
 
-export function AIAssistant({ appState }: AIAssistantProps) {
+export function AIAssistant({ appState, onDispatch }: AIAssistantProps) {
   const [open, setOpen] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pendingCall, setPendingCall] = useState<AIFunctionCall | null>(null)
 
-  // Settings form state
   const [settingsKey, setSettingsKey] = useState('')
   const [settingsModel, setSettingsModel] = useState(DEFAULT_MODEL)
   const [settingsSaved, setSettingsSaved] = useState(false)
@@ -59,29 +85,35 @@ export function AIAssistant({ appState }: AIAssistantProps) {
         return
       }
 
+      const history = loadChatHistory()
       const systemPrompt = buildFitnessSystemPrompt(appState)
-      serviceRef.current = new GeminiService(s.apiKey, systemPrompt, s.model)
+      serviceRef.current = new GeminiService(s.apiKey, systemPrompt, s.model, history)
 
-      setMessages([
-        {
-          role: 'model',
-          text:
-            'Привіт! Я твій персональний фітнес-асистент. Я вже в курсі твоїх активних програм, ' +
-            'останніх тренувань і поточного прогресу. Запитуй!',
-        },
-      ])
+      if (history.length > 0) {
+        setMessages(history)
+      } else {
+        setMessages([
+          {
+            role: 'model',
+            text:
+              'Привіт! Я твій персональний фітнес-асистент. Я вже в курсі твоїх активних програм, ' +
+              'останніх тренувань і поточного прогресу. Запитуй!',
+          },
+        ])
+      }
     } else {
       serviceRef.current = null
       setMessages([])
       setError(null)
       setShowSettings(false)
       setSettingsSaved(false)
+      setPendingCall(null)
     }
   }, [open]) // appState intentionally excluded — context is snapshot at open time
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading])
+  }, [messages, loading, pendingCall])
 
   function handleSaveSettings() {
     saveAISettings({ apiKey: settingsKey.trim(), model: settingsModel })
@@ -89,16 +121,27 @@ export function AIAssistant({ appState }: AIAssistantProps) {
     setTimeout(() => setSettingsSaved(false), 2500)
 
     if (settingsKey.trim()) {
+      const history = loadChatHistory()
       const systemPrompt = buildFitnessSystemPrompt(appState)
-      serviceRef.current = new GeminiService(settingsKey.trim(), systemPrompt, settingsModel)
+      serviceRef.current = new GeminiService(settingsKey.trim(), systemPrompt, settingsModel, history)
       setShowSettings(false)
-      setMessages([
-        {
+      if (history.length > 0) {
+        setMessages(history)
+      } else {
+        const greeting: ChatMessage = {
           role: 'model',
           text: 'Ключ збережено! Я готовий допомагати. Запитуй про тренування.',
-        },
-      ])
+        }
+        setMessages([greeting])
+        saveChatHistory([greeting])
+      }
     }
+  }
+
+  function handleClearHistory() {
+    localStorage.removeItem(HISTORY_KEY)
+    setMessages([])
+    setPendingCall(null)
   }
 
   async function handleSend(text?: string) {
@@ -111,12 +154,74 @@ export function AIAssistant({ appState }: AIAssistantProps) {
 
     setInput('')
     setError(null)
-    setMessages((prev) => [...prev, { role: 'user', text: msgText }])
+    const userMsg: ChatMessage = { role: 'user', text: msgText }
+    const nextMessages = [...messages, userMsg]
+    setMessages(nextMessages)
+    saveChatHistory(nextMessages)
     setLoading(true)
 
     try {
-      const reply = await serviceRef.current.sendMessage(msgText)
-      setMessages((prev) => [...prev, { role: 'model', text: reply }])
+      const response = await serviceRef.current.sendMessage(msgText)
+      if (response.kind === 'functionCall') {
+        let withLead = nextMessages
+        if (response.leadText) {
+          const leadMsg: ChatMessage = { role: 'model', text: response.leadText }
+          withLead = [...nextMessages, leadMsg]
+          setMessages(withLead)
+          saveChatHistory(withLead)
+        }
+        setPendingCall(response.call)
+      } else {
+        const reply: ChatMessage = { role: 'model', text: response.text }
+        const updated = [...nextMessages, reply]
+        setMessages(updated)
+        saveChatHistory(updated)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Невідома помилка')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleConfirmApply() {
+    if (!pendingCall || !serviceRef.current) return
+    const { exerciseName, weight, unit, runId } = pendingCall.args
+    onDispatch({
+      type: 'setExerciseWeightOverride',
+      payload: { runId, exerciseName, weight, unit },
+    })
+    setPendingCall(null)
+    setLoading(true)
+    try {
+      const text = await serviceRef.current.sendFunctionResult('adjust_exercise_weight', {
+        success: true,
+        message: `Вагу ${exerciseName} змінено на ${weight}${unit}`,
+      })
+      const reply: ChatMessage = { role: 'model', text }
+      const updated = [...messages, reply]
+      setMessages(updated)
+      saveChatHistory(updated)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Невідома помилка')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleConfirmCancel() {
+    if (!pendingCall || !serviceRef.current) return
+    setPendingCall(null)
+    setLoading(true)
+    try {
+      const text = await serviceRef.current.sendFunctionResult('adjust_exercise_weight', {
+        success: false,
+        reason: 'Користувач скасував зміну',
+      })
+      const reply: ChatMessage = { role: 'model', text }
+      const updated = [...messages, reply]
+      setMessages(updated)
+      saveChatHistory(updated)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Невідома помилка')
     } finally {
@@ -212,6 +317,10 @@ export function AIAssistant({ appState }: AIAssistantProps) {
                 Ключ зберігається тільки у браузері. Отримай безкоштовний ключ на{' '}
                 <span className="ai-settings-link">aistudio.google.com</span>
               </p>
+
+              <button className="ai-clear-btn" onClick={handleClearHistory}>
+                Очистити історію переписки
+              </button>
             </div>
           )}
 
@@ -220,7 +329,13 @@ export function AIAssistant({ appState }: AIAssistantProps) {
             <div className="ai-messages">
               {messages.map((msg, i) => (
                 <div key={i} className={`ai-bubble ai-bubble--${msg.role}`}>
-                  <p className="ai-bubble-text">{msg.text}</p>
+                  {msg.role === 'model' ? (
+                    <div className="ai-bubble-text">
+                      <ReactMarkdown>{msg.text}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="ai-bubble-text">{msg.text}</p>
+                  )}
                 </div>
               ))}
 
@@ -254,6 +369,31 @@ export function AIAssistant({ appState }: AIAssistantProps) {
             </div>
           )}
 
+          {/* Confirmation card for AI weight changes */}
+          {!showSettings && pendingCall && (
+            <div className="ai-confirm-card">
+              <p className="ai-confirm-text">
+                AI хоче змінити вагу:<br />
+                <strong>{pendingCall.args.exerciseName}</strong> → {pendingCall.args.weight}{' '}
+                {pendingCall.args.unit}
+              </p>
+              <div className="ai-confirm-actions">
+                <button
+                  className="ai-confirm-btn ai-confirm-btn--apply"
+                  onClick={() => void handleConfirmApply()}
+                >
+                  ✓ Застосувати
+                </button>
+                <button
+                  className="ai-confirm-btn ai-confirm-btn--cancel"
+                  onClick={() => void handleConfirmCancel()}
+                >
+                  ✕ Скасувати
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Input footer */}
           {!showSettings && (
             <div className="ai-input-row">
@@ -265,12 +405,12 @@ export function AIAssistant({ appState }: AIAssistantProps) {
                 onKeyDown={handleKeyDown}
                 placeholder="Запитай про тренування…"
                 rows={1}
-                disabled={loading}
+                disabled={loading || !!pendingCall}
               />
               <button
                 className="ai-send-btn"
                 onClick={() => void handleSend()}
-                disabled={loading || !input.trim()}
+                disabled={loading || !input.trim() || !!pendingCall}
                 aria-label="Надіслати"
               >
                 ↑
