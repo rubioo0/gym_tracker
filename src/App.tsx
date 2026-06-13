@@ -34,6 +34,7 @@ import { SessionPlanPanel } from './components/session/SessionPlanPanel'
 import { ProgramCalendarView } from './components/calendar/ProgramCalendarView'
 import { StatsTab } from './components/stats/StatsTab'
 import { PlanEditorModal } from './components/PlanEditorModal'
+import { AIAssistant } from './components/AIAssistant'
 import type {
   ExerciseDifficulty,
   LogActivityInput,
@@ -1879,6 +1880,7 @@ function App() {
       }}
       onClose={() => setEditingTemplateId(null)}
     />
+    <AIAssistant appState={state} />
     </>
   )
 }

@@ -13,6 +13,7 @@
     "url:convert": "node convert-fitwill-urls.mjs"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.0",
     "papaparse": "^5.5.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
