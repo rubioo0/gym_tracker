@@ -167,16 +167,21 @@ export function PlanEditorModal({ template, onSave, onClose }: PlanEditorModalPr
   const [errors, setErrors] = useState<string[]>([])
 
   useEffect(() => {
-    if (!template) return
-    setName(template.name)
-    setMode(template.mode)
-    setTrack(template.track)
-    setFocusTarget(template.focusTarget)
-    setSessions(template.sessions.map(toEditorSession))
+    if (template) {
+      setName(template.name)
+      setMode(template.mode)
+      setTrack(template.track)
+      setFocusTarget(template.focusTarget)
+      setSessions(template.sessions.map(toEditorSession))
+    } else {
+      setName('')
+      setMode('main')
+      setTrack('upper')
+      setFocusTarget('')
+      setSessions([newEditorSession(1)])
+    }
     setErrors([])
   }, [template])
-
-  if (!template) return null
 
   function updateSession(idx: number, patch: Partial<EditorSession>) {
     setSessions((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)))
@@ -251,19 +256,18 @@ export function PlanEditorModal({ template, onSave, onClose }: PlanEditorModalPr
   }
 
   function handleSave() {
-    if (!template) return
     const errs = validate()
     if (errs.length > 0) {
       setErrors(errs)
       return
     }
     const saved: ProgramTemplate = {
-      ...template,
-      id: template.id,
+      id: template?.id ?? makeId(),
       name: name.trim(),
       mode,
       track,
       focusTarget: focusTarget.trim(),
+      note: template?.note,
       sessions: sessions.map((s) => ({
         id: s.id,
         name: s.name.trim() || `Session ${s.order}`,
@@ -283,7 +287,7 @@ export function PlanEditorModal({ template, onSave, onClose }: PlanEditorModalPr
           <button type="button" className="plan-editor-header-btn" onClick={onClose}>
             Cancel
           </button>
-          <span className="plan-editor-header-title">Edit Plan</span>
+          <span className="plan-editor-header-title">{template ? 'Edit Plan' : 'Створити програму'}</span>
           <button type="button" className="plan-editor-header-btn plan-editor-save-btn" onClick={handleSave}>
             Save
           </button>

@@ -20,7 +20,7 @@ interface ChatMessage {
 }
 
 const HISTORY_KEY = 'gem3_chat_history'
-const HISTORY_LIMIT = 60
+const HISTORY_LIMIT = 30
 
 function loadChatHistory(): ChatMessage[] {
   try {
@@ -63,7 +63,11 @@ class AIErrorBoundary extends Component<{ children: ReactNode }, { hasError: boo
 
 function SafeMarkdown({ text }: { text: string }) {
   if (!text) return null
-  return <ReactMarkdown>{text}</ReactMarkdown>
+  return (
+    <AIErrorBoundary>
+      <ReactMarkdown>{text}</ReactMarkdown>
+    </AIErrorBoundary>
+  )
 }
 
 const SUGGESTED_PROMPTS = [

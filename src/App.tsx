@@ -36,6 +36,7 @@ import { StatsTab } from './components/stats/StatsTab'
 import { PlanEditorModal } from './components/PlanEditorModal'
 import { AIAssistant } from './components/AIAssistant'
 import { ProgressPhotos } from './components/photos/ProgressPhotos'
+import { AIGeneratorPanel } from './components/programs/AIGeneratorPanel'
 import type {
   ExerciseDifficulty,
   LogActivityInput,
@@ -48,17 +49,18 @@ import type {
 import { loadAISettings } from './services/geminiService'
 import './App.css'
 
-type AppTab = 'home' | 'runs' | 'session' | 'log' | 'history' | 'calendar' | 'stats' | 'photos' | 'data'
+type AppTab = 'home' | 'programs' | 'runs' | 'session' | 'log' | 'history' | 'calendar' | 'stats' | 'photos' | 'data'
 
 const tabs: { id: AppTab; label: string }[] = [
   { id: 'home', label: 'Головна' },
-  { id: 'runs', label: 'Програми / Тренування' },
+  { id: 'programs', label: 'Програми' },
+  { id: 'runs', label: 'Тренування' },
   { id: 'session', label: 'План сесії' },
-  { id: 'log', label: 'Завершити / Логування' },
+  { id: 'log', label: 'Завершити' },
   { id: 'history', label: 'Історія' },
   { id: 'calendar', label: 'Календар' },
   { id: 'stats', label: 'Статистика' },
-  { id: 'photos', label: 'Фото прогресу' },
+  { id: 'photos', label: 'Фото' },
   { id: 'data', label: 'Дані' },
 ]
 
@@ -135,6 +137,8 @@ function App() {
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([])
   const [selectedRunIds, setSelectedRunIds] = useState<string[]>([])
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null)
+  const [createProgramOpen, setCreateProgramOpen] = useState(false)
+  const [aiGenTemplate, setAiGenTemplate] = useState<ProgramTemplate | null>(null)
 
   const [exerciseInputs, setExerciseInputs] = useState<LogExerciseInput[]>([])
   const [activityInputs, setActivityInputs] = useState<LogActivityInput[]>([])
@@ -295,6 +299,7 @@ function App() {
   )
 
   const lastWorkout = state.workoutLogs[0] ?? null
+  const aiSettings = loadAISettings()
 
   const hasManualRunOverride = Boolean(
     state.selectedRunId && suggestedRun && state.selectedRunId !== suggestedRun.id,
@@ -807,7 +812,7 @@ function App() {
         )
       }
 
-      setActiveTab('runs')
+      setActiveTab('programs')
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unknown CSV import error.'
@@ -921,11 +926,25 @@ function App() {
         </section>
       )}
 
-      {activeTab === 'runs' && (
+      {activeTab === 'programs' && (
         <section className="panel-grid">
+          <article className="card card-wide">
+            <AIGeneratorPanel
+              apiKey={aiSettings.apiKey}
+              model={aiSettings.model}
+              onGenerated={(template) => setAiGenTemplate(template)}
+            />
+          </article>
+
           <article className="card card-wide">
             <h2>Шаблони програм</h2>
             <div className="action-row">
+              <button
+                type="button"
+                onClick={() => setCreateProgramOpen(true)}
+              >
+                + Створити програму
+              </button>
               <button
                 type="button"
                 className="btn-danger"
@@ -1065,7 +1084,11 @@ function App() {
               )
             })}
           </article>
+        </section>
+      )}
 
+      {activeTab === 'runs' && (
+        <section className="panel-grid">
           <article className="card card-wide">
             <h2>Тренування фокусу</h2>
             <div className="action-row">
@@ -1646,16 +1669,13 @@ function App() {
         />
       )}
 
-      {activeTab === 'photos' && (() => {
-        const aiSettings = loadAISettings()
-        return (
-          <section className="panel-grid">
-            <article className="card card-wide">
-              <ProgressPhotos apiKey={aiSettings.apiKey} model={aiSettings.model} />
-            </article>
-          </section>
-        )
-      })()}
+      {activeTab === 'photos' && (
+        <section className="panel-grid">
+          <article className="card card-wide">
+            <ProgressPhotos apiKey={aiSettings.apiKey} model={aiSettings.model} />
+          </article>
+        </section>
+      )}
 
       {activeTab === 'data' && (
         <section className="panel-grid">
@@ -1847,34 +1867,40 @@ function App() {
               </div>
             </div>
 
-            <div className="action-row">
-              <button
-                type="button"
-                onClick={() =>
-                  dispatch({
-                    type: 'replaceTemplates',
-                    templates: seededProgramTemplates,
-                  })
-                }
-              >
-                Replace Templates From Seed
-              </button>
-              <button type="button" onClick={handleResetAllData}>
-                Reset All Data
-              </button>
-              <button type="button" onClick={handleImportState}>
-                Import JSON From Box
-              </button>
-            </div>
+            <div className="template-group">
+              <h3>⚠️ Danger Zone</h3>
+              <p className="muted">
+                Небезпечні операції — скидання та перезапис даних.
+              </p>
+              <div className="action-row">
+                <button
+                  type="button"
+                  onClick={() =>
+                    dispatch({
+                      type: 'replaceTemplates',
+                      templates: seededProgramTemplates,
+                    })
+                  }
+                >
+                  Replace Templates From Seed
+                </button>
+                <button type="button" onClick={handleResetAllData}>
+                  Reset All Data
+                </button>
+                <button type="button" onClick={handleImportState}>
+                  Import JSON From Box
+                </button>
+              </div>
 
-            <label className="stacked-field">
-              State JSON (legacy/manual import)
-              <textarea
-                value={importText}
-                onChange={(event) => setImportText(event.target.value)}
-                rows={16}
-              />
-            </label>
+              <label className="stacked-field">
+                State JSON (legacy/manual import)
+                <textarea
+                  value={importText}
+                  onChange={(event) => setImportText(event.target.value)}
+                  rows={16}
+                />
+              </label>
+            </div>
 
             {dataMessage ? <p className="note">{dataMessage}</p> : null}
           </article>
@@ -1882,18 +1908,31 @@ function App() {
       )}
     </main>
 
-    <PlanEditorModal
-      template={
-        editingTemplateId
-          ? (getTemplateById(state.programTemplates, editingTemplateId) ?? null)
-          : null
-      }
-      onSave={(template) => {
-        dispatch({ type: 'updateProgramTemplate', template })
-        setEditingTemplateId(null)
-      }}
-      onClose={() => setEditingTemplateId(null)}
-    />
+    {editingTemplateId !== null && (
+      <PlanEditorModal
+        template={getTemplateById(state.programTemplates, editingTemplateId) ?? null}
+        onSave={(template) => {
+          dispatch({ type: 'updateProgramTemplate', template })
+          setEditingTemplateId(null)
+        }}
+        onClose={() => setEditingTemplateId(null)}
+      />
+    )}
+
+    {(createProgramOpen || aiGenTemplate !== null) && (
+      <PlanEditorModal
+        template={aiGenTemplate}
+        onSave={(template) => {
+          dispatch({ type: 'addProgramTemplate', template })
+          setCreateProgramOpen(false)
+          setAiGenTemplate(null)
+        }}
+        onClose={() => {
+          setCreateProgramOpen(false)
+          setAiGenTemplate(null)
+        }}
+      />
+    )}
     <AIAssistant appState={state} onDispatch={dispatch} />
     </>
   )
