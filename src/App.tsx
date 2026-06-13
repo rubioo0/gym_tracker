@@ -35,6 +35,7 @@ import { ProgramCalendarView } from './components/calendar/ProgramCalendarView'
 import { StatsTab } from './components/stats/StatsTab'
 import { PlanEditorModal } from './components/PlanEditorModal'
 import { AIAssistant } from './components/AIAssistant'
+import { ProgressPhotos } from './components/photos/ProgressPhotos'
 import type {
   ExerciseDifficulty,
   LogActivityInput,
@@ -44,9 +45,10 @@ import type {
   RunStatus,
   TrackType,
 } from './domain/types'
+import { loadAISettings } from './services/geminiService'
 import './App.css'
 
-type AppTab = 'home' | 'runs' | 'session' | 'log' | 'history' | 'calendar' | 'stats' | 'data'
+type AppTab = 'home' | 'runs' | 'session' | 'log' | 'history' | 'calendar' | 'stats' | 'photos' | 'data'
 
 const tabs: { id: AppTab; label: string }[] = [
   { id: 'home', label: 'Головна' },
@@ -56,6 +58,7 @@ const tabs: { id: AppTab; label: string }[] = [
   { id: 'history', label: 'Історія' },
   { id: 'calendar', label: 'Календар' },
   { id: 'stats', label: 'Статистика' },
+  { id: 'photos', label: 'Фото прогресу' },
   { id: 'data', label: 'Дані' },
 ]
 
@@ -1642,6 +1645,17 @@ function App() {
           programTemplates={state.programTemplates}
         />
       )}
+
+      {activeTab === 'photos' && (() => {
+        const aiSettings = loadAISettings()
+        return (
+          <section className="panel-grid">
+            <article className="card card-wide">
+              <ProgressPhotos apiKey={aiSettings.apiKey} model={aiSettings.model} />
+            </article>
+          </section>
+        )
+      })()}
 
       {activeTab === 'data' && (
         <section className="panel-grid">

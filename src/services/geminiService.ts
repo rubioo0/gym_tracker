@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import type { Tool } from '@google/generative-ai'
+import type { Part, Tool } from '@google/generative-ai'
 
 const STORAGE_KEY = 'gem3_ai_settings'
 
@@ -102,6 +102,46 @@ function mapError(err: unknown): Error {
     return new Error("Немає з'єднання з Gemini API. Перевір інтернет.")
   }
   return new Error(`Помилка Gemini: ${msg}`)
+}
+
+export async function analyzeProgressPhotos(
+  apiKey: string,
+  model: string,
+  photo1: { dataUrl: string; date: string },
+  photo2: { dataUrl: string; date: string },
+): Promise<string> {
+  try {
+    const client = new GoogleGenerativeAI(apiKey)
+    const genModel = client.getGenerativeModel({ model })
+
+    function toInlineData(dataUrl: string) {
+      const comma = dataUrl.indexOf(',')
+      const header = comma >= 0 ? dataUrl.slice(0, comma) : ''
+      const data = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl
+      const mimeType = header.match(/:(.*?);/)?.[1] ?? 'image/jpeg'
+      return { inlineData: { mimeType, data } }
+    }
+
+    const prompt =
+      `Ти — персональний фітнес-тренер. Порівняй ці два фото тіла.\n` +
+      `Перше фото: ${photo1.date}\n` +
+      `Друге фото: ${photo2.date}\n\n` +
+      `Проаналізуй:\n` +
+      `1. Видимі позитивні зміни у фізичній формі\n` +
+      `2. Зони, де є прогрес\n` +
+      `3. Конкретні рекомендації для подальших тренувань\n` +
+      `4. Поради як краще робити наступні фото для точнішого порівняння (кут, освітлення, поза)\n\n` +
+      `Відповідай тільки українською мовою. Будь конкретним і мотивуючим.`
+
+    const result = await genModel.generateContent([
+      toInlineData(photo1.dataUrl) as unknown as Part,
+      toInlineData(photo2.dataUrl) as unknown as Part,
+      prompt,
+    ])
+    return result.response.text()
+  } catch (err) {
+    throw mapError(err)
+  }
 }
 
 export class GeminiService {

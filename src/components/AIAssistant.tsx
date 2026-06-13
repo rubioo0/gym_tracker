@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import type { KeyboardEvent } from 'react'
+import { Component, useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import type { AppAction } from '../domain/reducer'
 import type { AppState } from '../domain/types'
@@ -39,6 +39,31 @@ function saveChatHistory(msgs: ChatMessage[]): void {
   } catch {
     // ignore storage errors
   }
+}
+
+class AIErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError(_: Error) {
+    return { hasError: true }
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="ai-error">
+          Помилка відображення повідомлень. Очисти історію і спробуй знову.
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+function SafeMarkdown({ text }: { text: string }) {
+  if (!text) return null
+  return <ReactMarkdown>{text}</ReactMarkdown>
 }
 
 const SUGGESTED_PROMPTS = [
@@ -326,12 +351,13 @@ export function AIAssistant({ appState, onDispatch }: AIAssistantProps) {
 
           {/* Messages */}
           {!showSettings && (
+            <AIErrorBoundary>
             <div className="ai-messages">
               {messages.map((msg, i) => (
                 <div key={i} className={`ai-bubble ai-bubble--${msg.role}`}>
                   {msg.role === 'model' ? (
                     <div className="ai-bubble-text">
-                      <ReactMarkdown>{msg.text}</ReactMarkdown>
+                      <SafeMarkdown text={msg.text} />
                     </div>
                   ) : (
                     <p className="ai-bubble-text">{msg.text}</p>
@@ -367,6 +393,7 @@ export function AIAssistant({ appState, onDispatch }: AIAssistantProps) {
 
               <div ref={messagesEndRef} />
             </div>
+            </AIErrorBoundary>
           )}
 
           {/* Confirmation card for AI weight changes */}
