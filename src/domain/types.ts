@@ -94,6 +94,8 @@ export interface FocusRun {
   pauseReason?: string
   baselineAnchors?: Record<string, BaselineAnchor> // exerciseId -> BaselineAnchor
   weightOverrides?: Record<string, { weight: number; unit: string }> // exerciseName -> override
+  setsOverrides?: Record<string, string> // exerciseName -> sets override e.g. "4"
+  repsOverrides?: Record<string, string> // exerciseName -> reps override e.g. "8-12"
 }
 
 export interface ExerciseLog {

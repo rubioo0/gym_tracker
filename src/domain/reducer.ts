@@ -34,7 +34,7 @@ export type AppAction =
   | { type: 'clearAllData'; templates: ProgramTemplate[] }
   | { type: 'updateProgramTemplate'; template: ProgramTemplate }
   | { type: 'addProgramTemplate'; template: ProgramTemplate }
-  | { type: 'setExerciseWeightOverride'; payload: { runId: string; exerciseName: string; weight: number; unit: string } }
+  | { type: 'setExerciseParamOverride'; payload: { runId: string; exerciseName: string; weight?: number; unit?: string; sets?: string; reps?: string } }
 
 function canTransition(from: RunStatus, to: RunStatus): boolean {
   if (from === to) {
@@ -594,15 +594,25 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       }
     }
 
-    case 'setExerciseWeightOverride': {
-      const { runId, exerciseName, weight, unit } = action.payload
+    case 'setExerciseParamOverride': {
+      const { runId, exerciseName, weight, unit, sets, reps } = action.payload
       return {
         ...state,
-        focusRuns: state.focusRuns.map((r) =>
-          r.id === runId
-            ? { ...r, weightOverrides: { ...r.weightOverrides, [exerciseName]: { weight, unit } } }
-            : r,
-        ),
+        focusRuns: state.focusRuns.map((r) => {
+          if (r.id !== runId) return r
+          return {
+            ...r,
+            weightOverrides: weight != null
+              ? { ...r.weightOverrides, [exerciseName]: { weight, unit: unit ?? 'kg' } }
+              : r.weightOverrides,
+            setsOverrides: sets != null
+              ? { ...r.setsOverrides, [exerciseName]: sets }
+              : r.setsOverrides,
+            repsOverrides: reps != null
+              ? { ...r.repsOverrides, [exerciseName]: reps }
+              : r.repsOverrides,
+          }
+        }),
       }
     }
 

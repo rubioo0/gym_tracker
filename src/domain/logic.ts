@@ -997,6 +997,12 @@ export function buildPlannedSession(
         plannedExercise.weightUnit = weightOverride.unit
       }
 
+      const setsOverride = run.setsOverrides?.[exercise.name]
+      if (setsOverride) plannedExercise.sets = setsOverride
+
+      const repsOverride = run.repsOverrides?.[exercise.name]
+      if (repsOverride) plannedExercise.reps = repsOverride
+
       return plannedExercise
     }),
   }

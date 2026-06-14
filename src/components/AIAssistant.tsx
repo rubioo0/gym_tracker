@@ -225,17 +225,21 @@ export function AIAssistant({ appState, onDispatch }: AIAssistantProps) {
 
   async function handleConfirmApply() {
     if (!pendingCall || !serviceRef.current) return
-    const { exerciseName, weight, unit, runId } = pendingCall.args
+    const { exerciseName, runId, weight, unit, sets, reps } = pendingCall.args
     onDispatch({
-      type: 'setExerciseWeightOverride',
-      payload: { runId, exerciseName, weight, unit },
+      type: 'setExerciseParamOverride',
+      payload: { runId, exerciseName, weight, unit, sets, reps },
     })
     setPendingCall(null)
     setLoading(true)
     try {
-      const text = await serviceRef.current.sendFunctionResult('adjust_exercise_weight', {
+      const parts: string[] = []
+      if (weight != null) parts.push(`вагу → ${weight}${unit ?? 'kg'}`)
+      if (sets) parts.push(`підходи → ${sets}`)
+      if (reps) parts.push(`повтори → ${reps}`)
+      const text = await serviceRef.current.sendFunctionResult('adjust_exercise_params', {
         success: true,
-        message: `Вагу ${exerciseName} змінено на ${weight}${unit}`,
+        message: `${exerciseName}: ${parts.join(', ')} змінено`,
       })
       const reply: ChatMessage = { role: 'model', text }
       const updated = [...messages, reply]
@@ -253,7 +257,7 @@ export function AIAssistant({ appState, onDispatch }: AIAssistantProps) {
     setPendingCall(null)
     setLoading(true)
     try {
-      const text = await serviceRef.current.sendFunctionResult('adjust_exercise_weight', {
+      const text = await serviceRef.current.sendFunctionResult('adjust_exercise_params', {
         success: false,
         reason: 'Користувач скасував зміну',
       })
@@ -414,9 +418,16 @@ export function AIAssistant({ appState, onDispatch }: AIAssistantProps) {
           {!showSettings && pendingCall && (
             <div className="ai-confirm-card">
               <p className="ai-confirm-text">
-                AI хоче змінити вагу:<br />
-                <strong>{pendingCall.args.exerciseName}</strong> → {pendingCall.args.weight}{' '}
-                {pendingCall.args.unit}
+                AI хоче змінити <strong>{pendingCall.args.exerciseName}</strong>:
+                {pendingCall.args.weight != null && (
+                  <><br />Вага: <strong>{pendingCall.args.weight} {pendingCall.args.unit ?? 'kg'}</strong></>
+                )}
+                {pendingCall.args.sets && (
+                  <><br />Підходи: <strong>{pendingCall.args.sets}</strong></>
+                )}
+                {pendingCall.args.reps && (
+                  <><br />Повтори: <strong>{pendingCall.args.reps}</strong></>
+                )}
               </p>
               <div className="ai-confirm-actions">
                 <button

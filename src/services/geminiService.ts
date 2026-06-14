@@ -23,8 +23,15 @@ export interface StoredChatMessage {
 }
 
 export type AIFunctionCall = {
-  name: 'adjust_exercise_weight'
-  args: { exerciseName: string; weight: number; unit: 'kg' | 'lbs'; runId: string }
+  name: 'adjust_exercise_params'
+  args: {
+    exerciseName: string
+    runId: string
+    weight?: number
+    unit?: 'kg' | 'lbs'
+    sets?: string
+    reps?: string
+  }
 }
 
 export type AIResponse =
@@ -55,9 +62,10 @@ const EXERCISE_TOOLS = [
   {
     functionDeclarations: [
       {
-        name: 'adjust_exercise_weight',
+        name: 'adjust_exercise_params',
         description:
-          'Змінює планову вагу для конкретної вправи в активному рані. Використовуй ТІЛЬКИ коли користувач явно просить змінити вагу — не для порад.',
+          'Змінює параметри вправи (вагу, кількість підходів або повторів) в активному рані. ' +
+          'Використовуй ТІЛЬКИ коли користувач явно просить змінити параметри — не для загальних порад.',
         parameters: {
           type: 'object',
           properties: {
@@ -65,21 +73,29 @@ const EXERCISE_TOOLS = [
               type: 'string',
               description: 'Точна назва вправи як вона вказана в програмі',
             },
+            runId: {
+              type: 'string',
+              description: 'ID активного рану (є в системному промпті поряд з назвою програми)',
+            },
             weight: {
               type: 'number',
-              description: 'Нова планова вага (число)',
+              description: 'Нова планова вага (якщо потрібно змінити)',
             },
             unit: {
               type: 'string',
               description: 'Одиниця виміру: kg або lbs',
               enum: ['kg', 'lbs'],
             },
-            runId: {
+            sets: {
               type: 'string',
-              description: 'ID активного рану (є в системному промпті поряд з назвою програми)',
+              description: 'Кількість підходів (якщо потрібно змінити), наприклад "4"',
+            },
+            reps: {
+              type: 'string',
+              description: 'Кількість повторів (якщо потрібно змінити), наприклад "8-12"',
             },
           },
-          required: ['exerciseName', 'weight', 'unit', 'runId'],
+          required: ['exerciseName', 'runId'],
         },
       },
     ],
@@ -318,7 +334,7 @@ export class GeminiService {
         return {
           kind: 'functionCall',
           call: {
-            name: call.name as 'adjust_exercise_weight',
+            name: call.name as 'adjust_exercise_params',
             args: call.args as unknown as AIFunctionCall['args'],
           },
           leadText,

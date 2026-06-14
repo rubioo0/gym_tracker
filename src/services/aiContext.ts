@@ -60,6 +60,10 @@ function buildActiveRunSection(
     if (ex.progressionNote) line += ` | ${ex.progressionNote}`
     const override = run.weightOverrides?.[ex.name]
     if (override) line += ` *(вагу змінено: ${override.weight}${override.unit})*`
+    const setsOv = run.setsOverrides?.[ex.name]
+    if (setsOv) line += ` *(підходи змінено: ${setsOv})*`
+    const repsOv = run.repsOverrides?.[ex.name]
+    if (repsOv) line += ` *(повтори змінено: ${repsOv})*`
     lines.push(line)
   }
 
