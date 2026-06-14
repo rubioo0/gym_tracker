@@ -25,9 +25,14 @@ const HISTORY_LIMIT = 30
 function loadChatHistory(): ChatMessage[] {
   try {
     const raw = localStorage.getItem(HISTORY_KEY)
-    if (raw) return JSON.parse(raw) as ChatMessage[]
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown
+      if (Array.isArray(parsed)) return parsed as ChatMessage[]
+      // Non-array stored value — clear it so the next open is clean
+      localStorage.removeItem(HISTORY_KEY)
+    }
   } catch {
-    // ignore
+    try { localStorage.removeItem(HISTORY_KEY) } catch { /* ignore */ }
   }
   return []
 }
@@ -114,21 +119,26 @@ export function AIAssistant({ appState, onDispatch }: AIAssistantProps) {
         return
       }
 
-      const history = loadChatHistory()
-      const systemPrompt = buildFitnessSystemPrompt(appState)
-      serviceRef.current = new GeminiService(s.apiKey, systemPrompt, s.model, history)
+      try {
+        const history = loadChatHistory()
+        const systemPrompt = buildFitnessSystemPrompt(appState)
+        serviceRef.current = new GeminiService(s.apiKey, systemPrompt, s.model, history)
 
-      if (history.length > 0) {
-        setMessages(history)
-      } else {
-        setMessages([
-          {
-            role: 'model',
-            text:
-              'Привіт! Я твій персональний фітнес-асистент. Я вже в курсі твоїх активних програм, ' +
-              'останніх тренувань і поточного прогресу. Запитуй!',
-          },
-        ])
+        if (history.length > 0) {
+          setMessages(history)
+        } else {
+          setMessages([
+            {
+              role: 'model',
+              text:
+                'Привіт! Я твій персональний фітнес-асистент. Я вже в курсі твоїх активних програм, ' +
+                'останніх тренувань і поточного прогресу. Запитуй!',
+            },
+          ])
+        }
+      } catch (err) {
+        // useEffect errors bypass React error boundaries — catch here to prevent blank screen
+        setError(err instanceof Error ? err.message : 'Помилка ініціалізації AI чату')
       }
     } else {
       serviceRef.current = null
