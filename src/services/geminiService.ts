@@ -291,7 +291,11 @@ export class GeminiService {
       systemInstruction: systemPrompt,
       tools: EXERCISE_TOOLS,
     })
-    const geminiHistory = history.slice(-20).map((m) => ({
+    // Gemini API requires history to start with a 'user' message — trim leading model turns
+    const recentHistory = history.slice(-20)
+    const firstUserIdx = recentHistory.findIndex((m) => m.role === 'user')
+    const trimmedHistory = firstUserIdx >= 0 ? recentHistory.slice(firstUserIdx) : []
+    const geminiHistory = trimmedHistory.map((m) => ({
       role: m.role,
       parts: [{ text: m.text }],
     }))
